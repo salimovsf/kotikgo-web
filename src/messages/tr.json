@@ -1,0 +1,65 @@
+{
+  "meta": {
+    "title": "KotikGo — AI Travel Assistant",
+    "description": "Plan your trip in one message. AI finds flights, transfers, hotels and tells you everything about the country."
+  },
+  "header": {
+    "services": "Services",
+    "destinations": "Destinations",
+    "start": "Start"
+  },
+  "hero": {
+    "badge": "AI Travel Assistant",
+    "title1": "Your entire trip —",
+    "title2": "in one message",
+    "desc": "Tell us where you're going. KotikGo will find flights, transfers, hotels, insurance and tell you everything about the country.",
+    "cta": "Start planning",
+    "more": "Learn more",
+    "stat_trips": "trips",
+    "stat_countries": "countries",
+    "stat_online": "AI online"
+  },
+  "services": {
+    "flights": "Flights",
+    "flights_desc": "Comparing hundreds of airlines. AI shows the best option.",
+    "transfers": "Transfers",
+    "transfers_desc": "Airport to hotel in any country. Fixed price.",
+    "hotels": "Hotels",
+    "hotels_desc": "Hotels and villas. We compare Booking, Agoda and find cheaper.",
+    "esim": "eSIM",
+    "esim_desc": "Internet in any country. We'll pick a plan for your trip.",
+    "insurance": "Insurance",
+    "insurance_desc": "Matched to your activities and country. Done in a minute.",
+    "ai": "AI Assistant",
+    "ai_desc": "Restaurants, visas, transport — ask anything, 24/7."
+  },
+  "destinations": {
+    "title": "Popular destinations",
+    "all": "All"
+  },
+  "cta": {
+    "title": "Where to next?",
+    "title2": "Just ask.",
+    "desc": "Flights, transfers, hotels, insurance — AI plans it all in a minute. Free.",
+    "button": "Plan a trip"
+  },
+  "chat": {
+    "greeting": "Hi! Tell me where and when you're planning to go, or just ask anything",
+    "placeholder": "Ask anything about your trip...",
+    "online": "AI online",
+    "checklist": "Checklist",
+    "new_chat": "New chat",
+    "my_trips": "My trips",
+    "history": "History",
+    "settings": "Settings",
+    "disclaimer": "KotikGo AI can make mistakes. Verify important information.",
+    "book": "Book",
+    "buy": "Buy",
+    "view": "View"
+  },
+  "footer": {
+    "services": "Services",
+    "destinations": "Destinations",
+    "support": "Support"
+  }
+}
