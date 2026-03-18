@@ -132,8 +132,27 @@ function stopsText(n: number): string {
   return `${n} пересадки`;
 }
 
+const MONTHS_RU = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+
+function formatDateRu(isoDate: string): string {
+  try {
+    const d = new Date(isoDate);
+    return `${d.getDate()} ${MONTHS_RU[d.getMonth()]}`;
+  } catch {
+    return isoDate.slice(0, 10);
+  }
+}
+
+function formatTimeFromISO(isoDate: string): string {
+  try {
+    return isoDate.slice(11, 16); // "HH:MM"
+  } catch {
+    return "";
+  }
+}
+
 // Fetch real prices from Travelpayouts
-async function fetchFlights(origin: string, destination: string, month?: string): Promise<string> {
+async function fetchFlights(origin: string, destination: string, dateStr?: string): Promise<string> {
   const token = process.env.TRAVELPAYOUTS_TOKEN;
   if (!token) return "";
 
@@ -149,7 +168,7 @@ async function fetchFlights(origin: string, destination: string, month?: string)
     limit: "15",
   });
 
-  if (month) params.set("departure_at", month);
+  if (dateStr) params.set("departure_at", dateStr);
 
   try {
     const res = await fetch(`https://api.travelpayouts.com/aviasales/v3/grouped_prices?${params}`);
@@ -166,23 +185,28 @@ async function fetchFlights(origin: string, destination: string, month?: string)
         const arrAirport = AIRPORTS[fl.destination_airport as string] || fl.destination_airport;
         const duration = formatDuration(fl.duration_to as number);
         const stops = stopsText(fl.transfers as number);
-        const depTime = (fl.departure_at as string).slice(0, 16).replace("T", " ");
+        const depAt = fl.departure_at as string;
+        const dateFormatted = formatDateRu(depAt);
+        const timeFormatted = formatTimeFromISO(depAt);
         const gate = fl.gate || "Aviasales";
         const link = fl.link ? `https://www.aviasales.ru${fl.link}` : "";
+        const price = fl.price as number;
 
-        return `- ${airlineName} | ${(fl.price as number).toLocaleString("ru")} ₽ | ${depTime} | ${depAirport} → ${arrAirport} | ${duration} | ${stops} | ${gate} | ${link}`;
+        return { airlineName, price, dateFormatted, timeFormatted, depAirport, arrAirport, duration, stops, gate, link };
       })
-      .sort((a, b) => {
-        const priceA = parseInt(a.match(/\d[\d\s]*/)?.[0]?.replace(/\s/g, "") || "0");
-        const priceB = parseInt(b.match(/\d[\d\s]*/)?.[0]?.replace(/\s/g, "") || "0");
-        return priceA - priceB;
-      })
+      .sort((a, b) => a.price - b.price)
       .slice(0, 12);
 
     if (flights.length === 0) return "";
 
+    const flightLines = flights.map(f =>
+      `- ${f.airlineName} | ${f.price.toLocaleString("ru")} ₽ | ${f.dateFormatted} ${f.timeFormatted} | ${f.depAirport} → ${f.arrAirport} | ${f.duration} | ${f.stops} | ${f.gate} | ${f.link}`
+    );
+
     return `\n\nREAL FLIGHT DATA from Travelpayouts (${origin} → ${destination}), sorted by price:
-Format: Airline | Price | Departure | Route | Duration | Stops | Seller | BuyLink
+Format: Airline | Price | Date Time | Route | Duration | Stops | Seller | BuyLink
+IMPORTANT: Use the "Date Time" field exactly as shown (e.g. "25 марта 08:30") in the departure field of the widget.
+If user asked for a SPECIFIC date, show ONLY flights on that date. If no exact date match, show closest dates and mention it.
 ${flights.join("\n")}
 
 IMPORTANT: Use these EXACT prices and airline names in the flights widget. Show the first one as "best", next 9 as "variants". Include airline full name (not code), airport names, duration, departure time, and number of stops. The "Ещё рейсы" link: https://www.aviasales.ru/search/${origin}${destination}`;
@@ -247,20 +271,39 @@ export async function POST(req: Request) {
     const { origin, destination } = findIATA(lastUserMsg.content);
     console.log("[chat] detected cities:", origin, "→", destination, "from:", lastUserMsg.content.slice(0, 50));
     if (origin && destination) {
-      // Try to extract month from message
-      const monthMatch = lastUserMsg.content.match(/(?:январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)\S*/i);
+      // Extract date from message: "25 марта", "в мае", "на март"
       const monthMap: Record<string, string> = {
         "январ": "01", "феврал": "02", "март": "03", "апрел": "04",
         "май": "05", "мая": "05", "июн": "06", "июл": "07",
         "август": "08", "сентябр": "09", "октябр": "10", "ноябр": "11", "декабр": "12",
       };
-      let month: string | undefined;
-      if (monthMatch) {
-        const m = monthMatch[0].toLowerCase().slice(0, 6);
+
+      let dateStr: string | undefined;
+      const text = lastUserMsg.content.toLowerCase();
+
+      // Try exact date: "25 марта", "3 мая"
+      const exactMatch = text.match(/(\d{1,2})\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)/i);
+      if (exactMatch) {
+        const day = exactMatch[1].padStart(2, "0");
+        const monthWord = exactMatch[0].replace(/\d+\s*/, "").trim().slice(0, 6);
         for (const [key, val] of Object.entries(monthMap)) {
-          if (m.startsWith(key)) {
-            month = `2026-${val}`;
+          if (monthWord.startsWith(key)) {
+            dateStr = `2026-${val}-${day}`;
             break;
+          }
+        }
+      }
+
+      // Fallback: just month "в мае", "на март", "апрель"
+      if (!dateStr) {
+        const monthMatch = text.match(/(?:январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)\S*/i);
+        if (monthMatch) {
+          const m = monthMatch[0].slice(0, 6);
+          for (const [key, val] of Object.entries(monthMap)) {
+            if (m.startsWith(key)) {
+              dateStr = `2026-${val}`;
+              break;
+            }
           }
         }
       }
@@ -282,7 +325,7 @@ export async function POST(req: Request) {
 
       // Fetch from all airports in parallel
       const results = await Promise.all(
-        destAirports.map(apt => fetchFlights(origin, apt, month))
+        destAirports.map(apt => fetchFlights(origin, apt, dateStr))
       );
       flightContext = results.filter(Boolean).join("\n");
     }

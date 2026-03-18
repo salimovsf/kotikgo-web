@@ -47,23 +47,21 @@ interface FlightInfo {
 }
 
 function FlightRow({ f, compact }: { f: FlightInfo; compact?: boolean }) {
-  const depTime = f.departure ? f.departure.split(" ")[1]?.slice(0, 5) : "";
-  const depDate = f.departure ? f.departure.split(" ")[0]?.slice(5) : ""; // MM-DD
+  const dep = f.departure || "";
   const duration = f.duration || f.time || "";
 
   return (
     <div className={`flex items-center gap-2.5 ${compact ? "px-3 py-2" : "p-3"} hover:bg-[var(--bg)] transition-colors`}>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[12.5px] font-bold text-[var(--text)]">{f.airline}</span>
           {f.gate && <span className="text-[10px] text-[var(--text-3)] bg-[var(--bg)] px-1.5 py-0.5 rounded">{f.gate}</span>}
         </div>
         <div className="text-[11px] text-[var(--text-3)] mt-0.5">
-          {depTime && <span>{depTime} · </span>}
+          {dep && <span>{dep} · </span>}
           {f.dep_airport && f.arr_airport && <span>{f.dep_airport} → {f.arr_airport} · </span>}
           {duration && <span>{duration} · </span>}
           <span>{f.stops}</span>
-          {depDate && <span> · {depDate}</span>}
         </div>
       </div>
       <div className="text-[13px] font-extrabold text-[var(--accent)] shrink-0 whitespace-nowrap">{f.price}</div>
