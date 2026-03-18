@@ -51,32 +51,33 @@ const CITY_STEMS: Array<{ stems: string[]; code: string }> = [
 
 function findIATA(text: string): { origin: string | null; destination: string | null } {
   const lower = text.toLowerCase();
-  const found: string[] = [];
 
-  // Sort by stem length descending to match longer names first
-  const sorted = [...CITY_STEMS].sort((a, b) => {
-    const maxA = Math.max(...a.stems.map(s => s.length));
-    const maxB = Math.max(...b.stems.map(s => s.length));
-    return maxB - maxA;
-  });
+  // Find all city matches with their position in text
+  const matches: Array<{ code: string; position: number }> = [];
 
-  for (const { stems, code } of sorted) {
-    if (found.includes(code)) continue;
+  for (const { stems, code } of CITY_STEMS) {
+    if (matches.some(m => m.code === code)) continue;
+    let earliest = Infinity;
     for (const stem of stems) {
-      if (lower.includes(stem)) {
-        found.push(code);
-        break;
+      const pos = lower.indexOf(stem);
+      if (pos !== -1 && pos < earliest) {
+        earliest = pos;
       }
     }
-    if (found.length >= 2) break;
+    if (earliest < Infinity) {
+      matches.push({ code, position: earliest });
+    }
   }
 
-  // If only destination found, assume Moscow as origin
-  if (found.length === 1) {
-    return { origin: "MOW", destination: found[0] };
+  // Sort by position in text — first mentioned = origin, second = destination
+  matches.sort((a, b) => a.position - b.position);
+
+  // If only one city found, assume Moscow as origin
+  if (matches.length === 1) {
+    return { origin: "MOW", destination: matches[0].code };
   }
-  if (found.length >= 2) {
-    return { origin: found[0], destination: found[1] };
+  if (matches.length >= 2) {
+    return { origin: matches[0].code, destination: matches[1].code };
   }
   return { origin: null, destination: null };
 }
