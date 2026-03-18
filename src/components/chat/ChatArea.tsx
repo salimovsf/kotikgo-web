@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useMemo } from "react";
 import { useChat, Chat } from "@ai-sdk/react";
-import { TextStreamChatTransport } from "ai";
+import { DefaultChatTransport } from "ai";
 import { useTranslations } from "next-intl";
 
 export function ChatArea() {
@@ -14,7 +14,7 @@ export function ChatArea() {
   const chat = useMemo(
     () =>
       new Chat({
-        transport: new TextStreamChatTransport({ api: "/api/chat" }),
+        transport: new DefaultChatTransport({ api: "/api/chat" }),
         messages: [
           {
             id: "greeting",
