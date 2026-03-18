@@ -10,24 +10,41 @@ interface Message {
   content: string;
 }
 
-function parseContent(content: string): Array<{ type: "text"; text: string } | { type: "widget"; kind: string; data: Record<string, unknown> }> {
-  const segments: Array<{ type: "text"; text: string } | { type: "widget"; kind: string; data: Record<string, unknown> }> = [];
+function parseContent(content: string): Array<{ type: "text"; text: string } | { type: "widget"; kind: string; data: Record<string, unknown> } | { type: "loading" }> {
+  const segments: Array<{ type: "text"; text: string } | { type: "widget"; kind: string; data: Record<string, unknown> } | { type: "loading" }> = [];
   const lines = content.split("\n");
   let textBuffer = "";
 
   for (const line of lines) {
-    const widgetMatch = line.match(/^\[widget:(\w+)\](.+)$/);
-    if (widgetMatch) {
+    // Check if line starts with [widget: — could be complete or still streaming
+    const widgetStart = line.match(/^\[widget:(\w+)\]/);
+    if (widgetStart) {
       if (textBuffer.trim()) {
         segments.push({ type: "text", text: textBuffer.trim() });
         textBuffer = "";
       }
-      try {
-        const data = JSON.parse(widgetMatch[2]);
-        segments.push({ type: "widget", kind: widgetMatch[1], data });
-      } catch {
-        textBuffer += line + "\n";
+
+      const jsonPart = line.slice(widgetStart[0].length);
+      if (!jsonPart) {
+        // Widget tag without data yet — show loading
+        segments.push({ type: "loading" });
+        continue;
       }
+
+      try {
+        const data = JSON.parse(jsonPart);
+        segments.push({ type: "widget", kind: widgetStart[1], data });
+      } catch {
+        // JSON incomplete — still streaming, show loading indicator
+        segments.push({ type: "loading" });
+      }
+    } else if (line.includes("[widget:") && !line.startsWith("[widget:")) {
+      // Widget tag in the middle of text — skip the widget part, keep text before
+      const idx = line.indexOf("[widget:");
+      const before = line.slice(0, idx);
+      if (before.trim()) textBuffer += before + "\n";
+      // Rest is incomplete widget — show loading
+      segments.push({ type: "loading" });
     } else {
       textBuffer += line + "\n";
     }
@@ -242,6 +259,11 @@ export function ChatArea({
                       seg.type === "text" ? (
                         <div key={i} className="bg-[var(--bg)] text-[var(--text)] rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
                           {seg.text}
+                        </div>
+                      ) : seg.type === "loading" ? (
+                        <div key={i} className="bg-[var(--bg)] rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+                          <span className="text-[12px] text-[var(--text-3)]">Подбираю варианты...</span>
                         </div>
                       ) : (
                         <div key={i}>{renderWidget(seg.kind, seg.data)}</div>
