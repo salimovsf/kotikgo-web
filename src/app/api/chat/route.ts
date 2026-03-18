@@ -125,7 +125,7 @@ IMPORTANT RULES:
 - Answer in the same language the user writes in
 - Be friendly but concise`;
 
-export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const { messages } = await req.json();

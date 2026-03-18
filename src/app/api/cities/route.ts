@@ -1,4 +1,4 @@
-export const runtime = "edge";
+export const dynamic = "force-dynamic";
 
 // Common cities IATA mapping — expand as needed
 const CITIES: Record<string, { iata: string; name_ru: string; name_en: string; country: string }> = {
