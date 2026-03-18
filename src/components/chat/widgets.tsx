@@ -32,44 +32,95 @@ function ActionButton({ text, type }: { text: string; type: "book" | "link" }) {
   );
 }
 
+/* ═══════ FLIGHT ROW ═══════ */
+interface FlightInfo {
+  airline: string;
+  dep_airport?: string;
+  arr_airport?: string;
+  departure?: string;
+  duration?: string;
+  stops: string;
+  price: string;
+  gate?: string;
+  link?: string;
+  time?: string; // fallback
+}
+
+function FlightRow({ f, compact }: { f: FlightInfo; compact?: boolean }) {
+  const depTime = f.departure ? f.departure.split(" ")[1]?.slice(0, 5) : "";
+  const depDate = f.departure ? f.departure.split(" ")[0]?.slice(5) : ""; // MM-DD
+  const duration = f.duration || f.time || "";
+
+  return (
+    <div className={`flex items-center gap-2.5 ${compact ? "px-3 py-2" : "p-3"} hover:bg-[var(--bg)] transition-colors`}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[12.5px] font-bold text-[var(--text)]">{f.airline}</span>
+          {f.gate && <span className="text-[10px] text-[var(--text-3)] bg-[var(--bg)] px-1.5 py-0.5 rounded">{f.gate}</span>}
+        </div>
+        <div className="text-[11px] text-[var(--text-3)] mt-0.5">
+          {depTime && <span>{depTime} · </span>}
+          {f.dep_airport && f.arr_airport && <span>{f.dep_airport} → {f.arr_airport} · </span>}
+          {duration && <span>{duration} · </span>}
+          <span>{f.stops}</span>
+          {depDate && <span> · {depDate}</span>}
+        </div>
+      </div>
+      <div className="text-[13px] font-extrabold text-[var(--accent)] shrink-0 whitespace-nowrap">{f.price}</div>
+      {f.link ? (
+        <a href={f.link} target="_blank" rel="noopener noreferrer"
+          className="shrink-0 bg-[var(--bg)] border border-[var(--border)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all">
+          Купить →
+        </a>
+      ) : (
+        <ActionButton text="Купить →" type="link" />
+      )}
+    </div>
+  );
+}
+
 /* ═══════ FLIGHTS ═══════ */
 export function FlightsWidget({ data }: WidgetProps) {
   const [expanded, setExpanded] = useState(false);
-  const best = data.best as { airline: string; stops: string; time: string; price: string };
-  const variants = (data.variants as typeof best[]) || [];
+  const best = data.best as FlightInfo;
+  const variants = (data.variants as FlightInfo[]) || [];
+  const moreLink = data.more_link as string | undefined;
 
   return (
     <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
-      {/* Collapsed */}
-      <div className="flex items-center gap-2.5 p-3">
-        <div className="w-8 h-8 rounded-lg bg-[var(--accent-bg)] flex items-center justify-center text-sm shrink-0">✈️</div>
-        <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-bold text-[var(--text)]">{data.from as string} → {data.to as string}</div>
-          <div className="text-[11px] text-[var(--text-3)]">{data.date as string} · {best.airline} · {best.stops}</div>
+      {/* Best option */}
+      <div className="border-b border-[var(--border)]">
+        <div className="px-3 pt-2.5 pb-1 flex items-center gap-1.5">
+          <span className="text-sm">✈️</span>
+          <span className="text-[12px] font-bold text-[var(--text)]">{data.from as string} → {data.to as string}</span>
         </div>
-        <div className="text-[13px] font-extrabold text-[var(--accent)] shrink-0">{best.price}</div>
-        <ActionButton text="Купить →" type="link" />
+        <FlightRow f={best} />
       </div>
 
       {/* Toggle */}
-      <div className="px-3 pb-2 flex justify-between items-center">
-        <span className="text-[10px] text-[var(--text-3)]">{variants.length > 0 ? `Ещё ${variants.length} вариантов` : ""}</span>
+      <div className="px-3 py-2 flex justify-between items-center">
+        <span className="text-[10px] text-[var(--text-3)]">
+          {variants.length > 0 ? `Ещё ${variants.length} рейсов` : ""}
+        </span>
         {variants.length > 0 && <ExpandButton expanded={expanded} onClick={() => setExpanded(!expanded)} />}
       </div>
 
-      {/* Expanded */}
+      {/* Expanded variants */}
       {expanded && variants.length > 0 && (
         <div className="border-t border-[var(--border)]">
           {variants.map((v, i) => (
-            <div key={i} className="flex items-center gap-2.5 px-3 py-2.5 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--bg)] transition-colors">
-              <div className="flex-1 min-w-0">
-                <div className="text-[12px] font-semibold text-[var(--text)]">{v.airline}</div>
-                <div className="text-[11px] text-[var(--text-3)]">{v.stops} · {v.time}</div>
-              </div>
-              <div className="text-[12.5px] font-bold text-[var(--text)] shrink-0">{v.price}</div>
-              <ActionButton text="Купить →" type="link" />
+            <div key={i} className="border-b border-[var(--border)] last:border-b-0">
+              <FlightRow f={v} compact />
             </div>
           ))}
+
+          {/* More flights link */}
+          {moreLink && (
+            <a href={moreLink} target="_blank" rel="noopener noreferrer"
+              className="block text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors border-t border-[var(--border)]">
+              Ещё рейсы на Aviasales →
+            </a>
+          )}
         </div>
       )}
     </div>

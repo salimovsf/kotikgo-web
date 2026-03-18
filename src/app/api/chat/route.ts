@@ -82,10 +82,58 @@ function findIATA(text: string): { origin: string | null; destination: string | 
   return { origin: null, destination: null };
 }
 
+// Airline names cache
+let airlineNames: Record<string, string> = {};
+let airlinesLoaded = false;
+
+async function loadAirlines() {
+  if (airlinesLoaded) return;
+  try {
+    const res = await fetch("https://api.travelpayouts.com/data/en/airlines.json");
+    const data = await res.json();
+    for (const a of data) {
+      if (!a.code) continue;
+      airlineNames[a.code] = a.name_translations?.ru || a.name || a.code;
+    }
+    airlinesLoaded = true;
+  } catch {}
+}
+
+// Airport names
+const AIRPORTS: Record<string, string> = {
+  SVO: "Шереметьево", DME: "Домодедово", VKO: "Внуково", ZIA: "Жуковский",
+  AYT: "Анталья", IST: "Стамбул", SAW: "Сабиха Гёкчен",
+  DPS: "Денпасар (Бали)", BKK: "Суварнабхуми", HKT: "Пхукет",
+  DXB: "Дубай", BCN: "Барселона", FCO: "Рим Фьюмичино",
+  CDG: "Париж Шарль-де-Голль", LHR: "Лондон Хитроу",
+  MLE: "Мале (Мальдивы)", HRG: "Хургада", SSH: "Шарм-эль-Шейх",
+  ATH: "Афины", TBS: "Тбилиси", EVN: "Ереван",
+  ALA: "Алматы", TAS: "Ташкент", LED: "Пулково",
+  AER: "Сочи", KZN: "Казань", SVX: "Екатеринбург",
+  GZP: "Газипаша (Алания)", DLM: "Даламан",
+  BJV: "Бодрум", CUN: "Канкун", GYD: "Баку",
+};
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}м`;
+  if (m === 0) return `${h}ч`;
+  return `${h}ч ${m}м`;
+}
+
+function stopsText(n: number): string {
+  if (n === 0) return "прямой";
+  if (n === 1) return "1 пересадка";
+  return `${n} пересадки`;
+}
+
 // Fetch real prices from Travelpayouts
 async function fetchFlights(origin: string, destination: string, month?: string): Promise<string> {
   const token = process.env.TRAVELPAYOUTS_TOKEN;
   if (!token) return "";
+
+  await loadAirlines();
 
   const params = new URLSearchParams({
     origin,
@@ -94,7 +142,7 @@ async function fetchFlights(origin: string, destination: string, month?: string)
     token,
     group_by: "departure_at",
     sorting: "price",
-    limit: "5",
+    limit: "15",
   });
 
   if (month) params.set("departure_at", month);
@@ -109,14 +157,31 @@ async function fetchFlights(origin: string, destination: string, month?: string)
     const flights = Object.values(data.data)
       .map((f: unknown) => {
         const fl = f as Record<string, unknown>;
-        const stops = fl.transfers === 0 ? "прямой" : `${fl.transfers} пересадка`;
-        return `- ${fl.airline} ${fl.flight_number}: ${fl.price} ₽, ${fl.departure_at}, ${stops}`;
+        const airlineName = airlineNames[fl.airline as string] || fl.airline;
+        const depAirport = AIRPORTS[fl.origin_airport as string] || fl.origin_airport;
+        const arrAirport = AIRPORTS[fl.destination_airport as string] || fl.destination_airport;
+        const duration = formatDuration(fl.duration_to as number);
+        const stops = stopsText(fl.transfers as number);
+        const depTime = (fl.departure_at as string).slice(0, 16).replace("T", " ");
+        const gate = fl.gate || "Aviasales";
+        const link = fl.link ? `https://www.aviasales.ru${fl.link}` : "";
+
+        return `- ${airlineName} | ${(fl.price as number).toLocaleString("ru")} ₽ | ${depTime} | ${depAirport} → ${arrAirport} | ${duration} | ${stops} | ${gate} | ${link}`;
       })
-      .slice(0, 5);
+      .sort((a, b) => {
+        const priceA = parseInt(a.match(/\d[\d\s]*/)?.[0]?.replace(/\s/g, "") || "0");
+        const priceB = parseInt(b.match(/\d[\d\s]*/)?.[0]?.replace(/\s/g, "") || "0");
+        return priceA - priceB;
+      })
+      .slice(0, 12);
 
     if (flights.length === 0) return "";
 
-    return `\n\nREAL FLIGHT PRICES from Travelpayouts (${origin} → ${destination}):\n${flights.join("\n")}\nUse these REAL prices in your flight widget. The affiliate link for buying: https://www.aviasales.ru/search/${origin}${destination}`;
+    return `\n\nREAL FLIGHT DATA from Travelpayouts (${origin} → ${destination}), sorted by price:
+Format: Airline | Price | Departure | Route | Duration | Stops | Seller | BuyLink
+${flights.join("\n")}
+
+IMPORTANT: Use these EXACT prices and airline names in the flights widget. Show the first one as "best", next 9 as "variants". Include airline full name (not code), airport names, duration, departure time, and number of stops. The "Ещё рейсы" link: https://www.aviasales.ru/search/${origin}${destination}`;
   } catch {
     return "";
   }
@@ -127,7 +192,10 @@ const SYSTEM_PROMPT = `You are KotikGo — a friendly AI travel assistant. You h
 CRITICAL: When recommending services (flights, transfers, hotels, eSIM, insurance), you MUST output special widget blocks. These are rendered as interactive cards in the UI.
 
 Widget format — place each on its own line:
-[widget:flights]{"from":"City","to":"City","date":"1 апр","best":{"airline":"Qatar Airways","stops":"1 пересадка","time":"14ч 30м","price":"от 42 000 ₽"},"variants":[{"airline":"Turkish Airlines","stops":"прямой","time":"4ч 15м","price":"от 58 000 ₽"},{"airline":"Pegasus","stops":"1 пересадка","time":"18ч","price":"от 38 000 ₽"}]}
+[widget:flights]{"from":"Москва","to":"Анталья","best":{"airline":"Pobeda","dep_airport":"Внуково","arr_airport":"Анталья","departure":"2026-05-03 08:30","duration":"4ч 15м","stops":"прямой","price":"от 12 439 ₽","gate":"Aviasales","link":"https://aviasales.ru/..."},"variants":[...up to 9 more sorted by price...],"more_link":"https://aviasales.ru/search/MOWAYT"}
+
+Each variant in "variants" has the same fields as "best": airline, dep_airport, arr_airport, departure, duration, stops, price, gate, link.
+Show up to 10 total (1 best + 9 variants). Sort by price ascending.
 
 [widget:transfer]{"from":"Аэропорт","to":"Отель","best":{"type":"Sedan","passengers":"4","price":"от $18"},"variants":[{"type":"Minivan","passengers":"7","price":"от $28"},{"type":"Minibus","passengers":"19","price":"от $45"}]}
 
