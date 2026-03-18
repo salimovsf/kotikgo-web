@@ -36,12 +36,16 @@ const CITY_STEMS: Array<{ stems: string[]; code: string }> = [
   { stems: ["куала", "kuala lumpur"], code: "KUL" },
   { stems: ["екатеринбург", "yekaterinburg"], code: "SVX" },
   { stems: ["новосибирск", "novosibirsk"], code: "OVB" },
-  { stems: ["кемер", "kemer"], code: "AYT" },
-  { stems: ["белек", "belek"], code: "AYT" },
-  { stems: ["алани", "alanya"], code: "GZP" },
-  { stems: ["фетхие", "fethiye"], code: "DLM" },
+  { stems: ["каш", "kas "], code: "_KAS" },
+  { stems: ["калкан", "kalkan"], code: "_KAL" },
+  { stems: ["кемер", "kemer"], code: "_KEM" },
+  { stems: ["белек", "belek"], code: "_BEL" },
+  { stems: ["сиде", "side"], code: "_SID" },
+  { stems: ["алани", "alanya"], code: "_ALA_TR" },
+  { stems: ["фетхие", "fethiye"], code: "_FET" },
   { stems: ["бодрум", "bodrum"], code: "BJV" },
-  { stems: ["мармарис", "marmaris"], code: "DLM" },
+  { stems: ["мармарис", "marmaris"], code: "_MAR" },
+  { stems: ["далян", "dalyan"], code: "_DLY" },
   { stems: ["тенериф", "tenerife"], code: "TFS" },
   { stems: ["прага", "prague"], code: "PRG" },
   { stems: ["будапешт", "budapest"], code: "BUD" },
@@ -72,9 +76,9 @@ function findIATA(text: string): { origin: string | null; destination: string | 
   // Sort by position in text — first mentioned = origin, second = destination
   matches.sort((a, b) => a.position - b.position);
 
-  // If only one city found, assume Moscow as origin
+  // If only one city found, don't assume origin — AI will ask
   if (matches.length === 1) {
-    return { origin: "MOW", destination: matches[0].code };
+    return { origin: null, destination: matches[0].code };
   }
   if (matches.length >= 2) {
     return { origin: matches[0].code, destination: matches[1].code };
@@ -189,34 +193,46 @@ IMPORTANT: Use these EXACT prices and airline names in the flights widget. Show 
 
 const SYSTEM_PROMPT = `You are KotikGo — a friendly AI travel assistant. You help people plan trips anywhere in the world.
 
-CRITICAL: When recommending services (flights, transfers, hotels, eSIM, insurance), you MUST output special widget blocks. These are rendered as interactive cards in the UI.
+CRITICAL RULES FOR ORIGIN CITY:
+- If the user does NOT mention where they're flying FROM, you MUST ask: "Откуда планируете вылет?" (or in the user's language)
+- NEVER assume Moscow or any city as origin. Always ask.
+- Only proceed with widgets after you know both origin AND destination.
 
-Widget format — place each on its own line:
-[widget:flights]{"from":"Москва","to":"Анталья","best":{"airline":"Pobeda","dep_airport":"Внуково","arr_airport":"Анталья","departure":"2026-05-03 08:30","duration":"4ч 15м","stops":"прямой","price":"от 12 439 ₽","gate":"Aviasales","link":"https://aviasales.ru/..."},"variants":[...up to 9 more sorted by price...],"more_link":"https://aviasales.ru/search/MOWAYT"}
+WIDGET FORMAT — each on its own line, JSON must be valid and complete on ONE line:
 
-Each variant in "variants" has the same fields as "best": airline, dep_airport, arr_airport, departure, duration, stops, price, gate, link.
-Show up to 10 total (1 best + 9 variants). Sort by price ascending.
+[widget:flights]{"from":"City","to":"City","best":{"airline":"Full Airline Name","dep_airport":"Airport","arr_airport":"Airport","departure":"2026-05-03 08:30","duration":"4ч 15м","stops":"прямой","price":"от 12 439 ₽","gate":"Aviasales","link":"https://..."},"variants":[...up to 9 more...],"more_link":"https://aviasales.ru/search/..."}
+[widget:transfer]{"from":"Аэропорт Анталья","to":"Каш","best":{"type":"Sedan","passengers":"4","price":"от $80"},"variants":[{"type":"Minivan","passengers":"7","price":"от $100"},{"type":"Minibus","passengers":"19","price":"от $150"}]}
+[widget:hotel]{"location":"Каш","nights":"7 ночей","best":{"name":"Hotel Name","rating":"4.8","area":"район","price":"от $40/ночь"},"variants":[...2+ more...]}
+[widget:esim]{"country":"Турция","best":{"operator":"Turkcell","gb":"10","days":"7","price":"$8"},"variants":[...2+ more...]}
+[widget:insurance]{"days":"7","best":{"name":"Базовая","coverage":"$50 000","includes":"стандарт","price":"$18"},"variants":[...2+ more...]}
+[widget:info]{"items":[{"label":"Виза","value":"не нужна до 30 дней"},{"label":"Валюта","value":"TRY (лира)"},{"label":"Розетки","value":"тип C/F"}]}
 
-[widget:transfer]{"from":"Аэропорт","to":"Отель","best":{"type":"Sedan","passengers":"4","price":"от $18"},"variants":[{"type":"Minivan","passengers":"7","price":"от $28"},{"type":"Minibus","passengers":"19","price":"от $45"}]}
+WHEN TO SHOW WHICH WIDGETS:
 
-[widget:hotel]{"location":"Убуд","nights":"14 ночей","best":{"name":"Villa Harmony","rating":"4.8","area":"центр","price":"от $32/ночь"},"variants":[{"name":"Rice Terrace Inn","rating":"4.6","area":"террасы","price":"от $28/ночь"},{"name":"Jungle Retreat","rating":"4.9","area":"лес","price":"от $45/ночь"}]}
+FULL SET (all 6 widgets) — when user says they want to TRAVEL somewhere (e.g. "хочу в Каш", "лечу на Бали", "поездка в Дубай"):
+→ flights + transfer + hotel + esim + insurance + info
 
-[widget:esim]{"country":"Индонезия","best":{"operator":"Telkomsel","gb":"15","days":"14","price":"$9"},"variants":[{"operator":"XL Axiata","gb":"8","days":"14","price":"$6"},{"operator":"Telkomsel","gb":"30","days":"14","price":"$15"}]}
+PARTIAL — when user asks about specific service:
+→ "найди билеты" = only flights
+→ "нужен трансфер" = only transfer
+→ "какой eSIM" = only esim
+→ "нужна страховка" = only insurance
 
-[widget:insurance]{"days":"14","best":{"name":"Базовая","coverage":"$50 000","includes":"стандарт","price":"$22"},"variants":[{"name":"Расширенная","coverage":"$100 000","includes":"водные виды спорта","price":"$35"},{"name":"Премиум","coverage":"$200 000","includes":"всё + отмена рейса","price":"$55"}]}
+NO WIDGETS — casual questions:
+→ restaurants, weather, visa rules, tips, documents = plain text answer only
 
-[widget:checklist]{"items":[{"text":"Виза — не нужна до 30 дней","done":true},{"text":"Билеты","done":false},{"text":"Трансфер","done":false}]}
+AIRPORTS FOR CITIES WITHOUT OWN AIRPORT:
+- When REAL FLIGHT DATA is provided for multiple airports, include ALL of them in one flights widget, sorted by price
+- The transfer widget should show route from the arrival AIRPORT to the user's DESTINATION city (e.g. "Аэропорт Анталья → Каш", NOT "Аэропорт → Анталья")
 
-[widget:info]{"items":[{"label":"Виза","value":"не нужна"},{"label":"Валюта","value":"IDR"},{"label":"Розетки","value":"тип C"}]}
-
-IMPORTANT RULES:
-- When REAL FLIGHT PRICES are provided in the context (from Travelpayouts), use THOSE exact prices in the flights widget — they are real and current
-- Output widgets ONLY when relevant
-- For casual questions (restaurants, tips) answer with plain text only
-- JSON must be valid and on ONE line after [widget:type]
-- Always 2+ variants in addition to the best
+IMPORTANT:
+- When REAL FLIGHT PRICES are provided in context, use THOSE exact prices — they are real and current
+- Each variant has same fields as best: airline, dep_airport, arr_airport, departure, duration, stops, price, gate, link
+- Sort flights by price ascending
 - Answer in the same language the user writes in
-- Be friendly but concise`;
+- Use markdown for text formatting (bold, lists) but NOT inside widget JSON
+- Be friendly but concise
+- Do NOT output [widget:checklist] — it is deprecated`;
 
 export const dynamic = "force-dynamic";
 
@@ -249,7 +265,26 @@ export async function POST(req: Request) {
         }
       }
 
-      flightContext = await fetchFlights(origin, destination, month);
+      // Cities without own airport → search multiple nearby airports
+      const MULTI_AIRPORT: Record<string, string[]> = {
+        "_KAS": ["AYT", "DLM"],      // Каш → Анталья (3.5ч) + Даламан (1.5ч)
+        "_KAL": ["DLM", "AYT"],      // Калкан → Даламан + Анталья
+        "_KEM": ["AYT"],             // Кемер → Анталья (1ч)
+        "_BEL": ["AYT"],             // Белек → Анталья (30мин)
+        "_SID": ["AYT"],             // Сиде → Анталья (1.5ч)
+        "_ALA_TR": ["GZP", "AYT"],   // Алания → Газипаша + Анталья
+        "_FET": ["DLM", "AYT"],      // Фетхие → Даламан (1ч) + Анталья (3ч)
+        "_MAR": ["DLM", "BJV"],      // Мармарис → Даламан + Бодрум
+        "_DLY": ["DLM"],             // Далян → Даламан
+      };
+
+      const destAirports = MULTI_AIRPORT[destination] || [destination];
+
+      // Fetch from all airports in parallel
+      const results = await Promise.all(
+        destAirports.map(apt => fetchFlights(origin, apt, month))
+      );
+      flightContext = results.filter(Boolean).join("\n");
     }
   }
 

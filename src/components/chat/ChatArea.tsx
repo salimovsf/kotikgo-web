@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { renderWidget } from "./widgets";
+import Markdown from "react-markdown";
 
 interface Message {
   id: string;
@@ -257,8 +258,8 @@ export function ChatArea({
                   ) : (
                     segments.map((seg, i) =>
                       seg.type === "text" ? (
-                        <div key={i} className="bg-[var(--bg)] text-[var(--text)] rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
-                          {seg.text}
+                        <div key={i} className="bg-[var(--bg)] text-[var(--text)] rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-[var(--text)]">
+                          <Markdown>{seg.text}</Markdown>
                         </div>
                       ) : seg.type === "loading" ? (
                         <div key={i} className="bg-[var(--bg)] rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-2">

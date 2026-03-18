@@ -355,7 +355,6 @@ const WIDGET_MAP: Record<string, React.ComponentType<WidgetProps>> = {
   hotel: HotelWidget,
   esim: EsimWidget,
   insurance: InsuranceWidget,
-  checklist: ChecklistWidget,
   info: InfoWidget,
 };
 
