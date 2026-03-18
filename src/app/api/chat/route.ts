@@ -178,7 +178,9 @@ export async function POST(req: Request) {
   });
 
   if (!response.ok) {
-    return new Response(JSON.stringify({ error: "AI error" }), {
+    const errBody = await response.text().catch(() => "no body");
+    console.error("OpenRouter error:", response.status, errBody);
+    return new Response(JSON.stringify({ error: "AI error", status: response.status, details: errBody }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
