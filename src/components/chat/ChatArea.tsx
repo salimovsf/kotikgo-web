@@ -10,7 +10,6 @@ interface Message {
   content: string;
 }
 
-/* Parse AI text into segments: plain text or widget blocks */
 function parseContent(content: string): Array<{ type: "text"; text: string } | { type: "widget"; kind: string; data: Record<string, unknown> }> {
   const segments: Array<{ type: "text"; text: string } | { type: "widget"; kind: string; data: Record<string, unknown> }> = [];
   const lines = content.split("\n");
@@ -41,25 +40,78 @@ function parseContent(content: string): Array<{ type: "text"; text: string } | {
   return segments;
 }
 
-export function ChatArea() {
+export function ChatArea({
+  chatId,
+  onChatCreated,
+  createChat,
+}: {
+  chatId: string | null;
+  onChatCreated: (id: string) => void;
+  createChat: () => Promise<string | null>;
+}) {
   const t = useTranslations("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    { id: "greeting", role: "assistant", content: t("greeting") + " 😊" },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load messages when chatId changes
+  useEffect(() => {
+    if (!chatId) {
+      setMessages([]);
+      setLoaded(true);
+      return;
+    }
+
+    fetch(`/api/chats/${chatId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.chat?.messages) {
+          setMessages(
+            data.chat.messages.map((m: { id: string; role: string; content: string }) => ({
+              id: m.id,
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            }))
+          );
+        }
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, [chatId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const saveMessage = useCallback(async (cId: string, role: string, content: string) => {
+    try {
+      await fetch(`/api/chats/${cId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, content }),
+      });
+    } catch {}
+  }, []);
+
   const sendMessage = useCallback(async (text: string) => {
+    // Create chat if none
+    let cId = chatId;
+    if (!cId) {
+      cId = await createChat();
+      if (!cId) return;
+      onChatCreated(cId);
+    }
+
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: text };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setIsLoading(true);
+
+    // Save user message
+    saveMessage(cId, "user", text);
 
     try {
       const res = await fetch("/api/chat", {
@@ -94,16 +146,20 @@ export function ChatArea() {
           )
         );
       }
+
+      // Save assistant message
+      saveMessage(cId, "assistant", assistantContent);
     } catch (err) {
       console.error("Chat error:", err);
+      const errMsg = "Произошла ошибка. Попробуйте ещё раз.";
       setMessages((prev) => [
         ...prev,
-        { id: (Date.now() + 2).toString(), role: "assistant", content: "Произошла ошибка. Попробуйте ещё раз." },
+        { id: (Date.now() + 2).toString(), role: "assistant", content: errMsg },
       ]);
     } finally {
       setIsLoading(false);
     }
-  }, [messages]);
+  }, [messages, chatId, createChat, onChatCreated, saveMessage]);
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -128,6 +184,8 @@ export function ChatArea() {
     }
   };
 
+  const greeting = t("greeting") + " 😊";
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Top bar */}
@@ -142,6 +200,16 @@ export function ChatArea() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-7">
         <div className="max-w-[700px] mx-auto px-5 flex flex-col gap-5">
+          {/* Greeting always first */}
+          <div className="flex gap-2.5 items-start">
+            <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center text-xs text-white shrink-0 mt-0.5">🐱</div>
+            <div className="max-w-[580px]">
+              <div className="bg-[var(--bg)] text-[var(--text)] rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed">
+                {greeting}
+              </div>
+            </div>
+          </div>
+
           {messages.map((msg) => {
             if (msg.role === "user") {
               return (
@@ -155,17 +223,13 @@ export function ChatArea() {
               );
             }
 
-            /* Assistant message — parse for widgets */
             const segments = parseContent(msg.content);
 
             return (
               <div key={msg.id} className="flex gap-2.5 items-start">
-                <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center text-xs text-white shrink-0 mt-0.5">
-                  🐱
-                </div>
+                <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center text-xs text-white shrink-0 mt-0.5">🐱</div>
                 <div className="max-w-[580px] flex flex-col gap-2 flex-1 min-w-0">
                   {segments.length === 0 && !msg.content ? (
-                    /* Loading dots */
                     <div className="bg-[var(--bg)] rounded-2xl rounded-bl-sm px-4 py-3">
                       <span className="flex gap-1">
                         <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
@@ -176,10 +240,7 @@ export function ChatArea() {
                   ) : (
                     segments.map((seg, i) =>
                       seg.type === "text" ? (
-                        <div
-                          key={i}
-                          className="bg-[var(--bg)] text-[var(--text)] rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap"
-                        >
+                        <div key={i} className="bg-[var(--bg)] text-[var(--text)] rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
                           {seg.text}
                         </div>
                       ) : (
