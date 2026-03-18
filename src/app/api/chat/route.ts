@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, createUIMessageStreamResponse } from "ai";
+import { streamText } from "ai";
 
 const openrouter = createOpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -35,11 +35,11 @@ Always be helpful. If someone asks about restaurants, local tips, documents — 
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  return createUIMessageStreamResponse({
-    stream: streamText({
-      model: openrouter("google/gemini-2.0-flash-001"),
-      system: SYSTEM_PROMPT,
-      messages,
-    }).toUIMessageStream(),
+  const result = streamText({
+    model: openrouter("google/gemini-2.0-flash-001"),
+    system: SYSTEM_PROMPT,
+    messages,
   });
+
+  return result.toTextStreamResponse();
 }

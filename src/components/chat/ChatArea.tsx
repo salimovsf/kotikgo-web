@@ -1,36 +1,76 @@
 "use client";
 
-import { useRef, useEffect, useState, useMemo } from "react";
-import { useChat, Chat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
 
 export function ChatArea() {
   const t = useTranslations("chat");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
-
-  const chat = useMemo(
-    () =>
-      new Chat({
-        transport: new DefaultChatTransport({ api: "/api/chat" }),
-        messages: [
-          {
-            id: "greeting",
-            role: "assistant",
-            parts: [{ type: "text", text: t("greeting") + " 😊" }],
-          },
-        ],
-      }),
-    [t]
-  );
-
-  const { messages, sendMessage, status } = useChat({ chat });
-  const isLoading = status === "streaming" || status === "submitted";
+  const [messages, setMessages] = useState<Message[]>([
+    { id: "greeting", role: "assistant", content: t("greeting") + " 😊" },
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendMessage = useCallback(async (text: string) => {
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: text };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No reader");
+
+      const decoder = new TextDecoder();
+      const assistantId = (Date.now() + 1).toString();
+      let assistantContent = "";
+
+      setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        assistantContent += chunk;
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: assistantContent } : m
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Chat error:", err);
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 2).toString(), role: "assistant", content: "Произошла ошибка. Попробуйте ещё раз." },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   }, [messages]);
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -46,7 +86,7 @@ export function ChatArea() {
     const text = input;
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-    sendMessage({ text });
+    sendMessage(text);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -54,17 +94,6 @@ export function ChatArea() {
       e.preventDefault();
       onSubmit(e);
     }
-  };
-
-  const getMessageText = (msg: (typeof messages)[number]) => {
-    if ("content" in msg && typeof msg.content === "string") return msg.content;
-    if ("parts" in msg && Array.isArray(msg.parts)) {
-      return msg.parts
-        .filter((p: { type: string }) => p.type === "text")
-        .map((p: { type: string; text: string }) => p.text)
-        .join("");
-    }
-    return "";
   };
 
   return (
@@ -81,47 +110,32 @@ export function ChatArea() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-7">
         <div className="max-w-[700px] mx-auto px-5 flex flex-col gap-5">
-          {messages.map((msg) => {
-            const text = getMessageText(msg);
-            const role = (msg as { role: string }).role;
-            if (!text) return null;
-            return (
-              <div key={msg.id} className={`flex ${role === "user" ? "justify-end" : "gap-2.5 items-start"}`}>
-                {role === "assistant" && (
-                  <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center text-xs text-white shrink-0 mt-0.5">
-                    🐱
-                  </div>
-                )}
-                <div className="max-w-[580px]">
-                  <div
-                    className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
-                      role === "user"
-                        ? "bg-[var(--accent)] text-white rounded-br-sm"
-                        : "bg-[var(--bg)] text-[var(--text)] rounded-bl-sm"
-                    }`}
-                  >
-                    {text}
-                  </div>
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "gap-2.5 items-start"}`}>
+              {msg.role === "assistant" && (
+                <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center text-xs text-white shrink-0 mt-0.5">
+                  🐱
                 </div>
-              </div>
-            );
-          })}
-
-          {isLoading && (messages[messages.length - 1] as { role: string })?.role === "user" && (
-            <div className="flex gap-2.5 items-start">
-              <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center text-xs text-white shrink-0 mt-0.5">
-                🐱
-              </div>
-              <div className="bg-[var(--bg)] rounded-2xl rounded-bl-sm px-4 py-3">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              )}
+              <div className="max-w-[580px]">
+                <div
+                  className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                    msg.role === "user"
+                      ? "bg-[var(--accent)] text-white rounded-br-sm"
+                      : "bg-[var(--bg)] text-[var(--text)] rounded-bl-sm"
+                  }`}
+                >
+                  {msg.content || (
+                    <span className="flex gap-1">
+                      <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
-          )}
-
+          ))}
           <div ref={messagesEndRef} />
         </div>
       </div>
