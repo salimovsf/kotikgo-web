@@ -1,50 +1,74 @@
 // IATA codes for common cities (for resolving city names to codes)
-const CITY_IATA: Record<string, string> = {
-  "москва": "MOW", "moscow": "MOW",
-  "петербург": "LED", "санкт-петербург": "LED", "питер": "LED",
-  "стамбул": "IST", "istanbul": "IST",
-  "анталья": "AYT", "анталия": "AYT", "antalya": "AYT",
-  "бали": "DPS", "денпасар": "DPS", "bali": "DPS",
-  "бангкок": "BKK", "bangkok": "BKK",
-  "пхукет": "HKT", "phuket": "HKT",
-  "дубай": "DXB", "dubai": "DXB",
-  "барселона": "BCN", "barcelona": "BCN",
-  "рим": "FCO", "rome": "FCO",
-  "париж": "PAR", "paris": "PAR",
-  "лондон": "LON", "london": "LON",
-  "мальдивы": "MLE", "мале": "MLE", "maldives": "MLE",
-  "шри-ланка": "CMB", "коломбо": "CMB",
-  "гоа": "GOA", "goa": "GOA",
-  "тбилиси": "TBS", "tbilisi": "TBS",
-  "ереван": "EVN", "yerevan": "EVN",
-  "алматы": "ALA", "almaty": "ALA",
-  "ташкент": "TAS", "tashkent": "TAS",
-  "сочи": "AER", "sochi": "AER",
-  "казань": "KZN", "kazan": "KZN",
-  "афины": "ATH", "athens": "ATH",
-  "каир": "CAI", "cairo": "CAI",
-  "хургада": "HRG", "hurghada": "HRG",
-  "шарм": "SSH", "шарм-эль-шейх": "SSH",
-  "канкун": "CUN", "cancun": "CUN",
-  "сеул": "SEL", "seoul": "SEL",
-  "токио": "TYO", "tokyo": "TYO",
-  "сингапур": "SIN", "singapore": "SIN",
-  "нячанг": "NHA", "хошимин": "SGN", "ханой": "HAN",
-  "куала-лумпур": "KUL",
-  "екатеринбург": "SVX", "новосибирск": "OVB",
-};
+// Map stem (корень) → IATA. We match by substring to handle Russian cases (падежи)
+const CITY_STEMS: Array<{ stems: string[]; code: string }> = [
+  { stems: ["москв", "moscow"], code: "MOW" },
+  { stems: ["петербург", "питер"], code: "LED" },
+  { stems: ["стамбул", "istanbul"], code: "IST" },
+  { stems: ["антал", "antalya"], code: "AYT" },
+  { stems: ["бали", "денпасар", "bali"], code: "DPS" },
+  { stems: ["бангкок", "bangkok"], code: "BKK" },
+  { stems: ["пхукет", "phuket"], code: "HKT" },
+  { stems: ["дубай", "дубаи", "dubai"], code: "DXB" },
+  { stems: ["барселон", "barcelona"], code: "BCN" },
+  { stems: ["рим", "rome", "roma"], code: "FCO" },
+  { stems: ["париж", "paris"], code: "PAR" },
+  { stems: ["лондон", "london"], code: "LON" },
+  { stems: ["мальдив", "мале", "maldives"], code: "MLE" },
+  { stems: ["шри-ланк", "коломбо", "sri lanka"], code: "CMB" },
+  { stems: ["гоа", "goa"], code: "GOA" },
+  { stems: ["тбилис", "tbilisi"], code: "TBS" },
+  { stems: ["ереван", "yerevan"], code: "EVN" },
+  { stems: ["алмат", "almaty"], code: "ALA" },
+  { stems: ["ташкент", "tashkent"], code: "TAS" },
+  { stems: ["сочи", "sochi"], code: "AER" },
+  { stems: ["казан", "kazan"], code: "KZN" },
+  { stems: ["афин", "athens"], code: "ATH" },
+  { stems: ["каир", "cairo"], code: "CAI" },
+  { stems: ["хургад", "hurghada"], code: "HRG" },
+  { stems: ["шарм", "sharm"], code: "SSH" },
+  { stems: ["канкун", "cancun"], code: "CUN" },
+  { stems: ["сеул", "seoul"], code: "SEL" },
+  { stems: ["токио", "tokyo"], code: "TYO" },
+  { stems: ["сингапур", "singapore"], code: "SIN" },
+  { stems: ["нячанг", "nha trang"], code: "NHA" },
+  { stems: ["хошимин", "ho chi minh"], code: "SGN" },
+  { stems: ["ханой", "hanoi"], code: "HAN" },
+  { stems: ["куала", "kuala lumpur"], code: "KUL" },
+  { stems: ["екатеринбург", "yekaterinburg"], code: "SVX" },
+  { stems: ["новосибирск", "novosibirsk"], code: "OVB" },
+  { stems: ["кемер", "kemer"], code: "AYT" },
+  { stems: ["белек", "belek"], code: "AYT" },
+  { stems: ["алани", "alanya"], code: "GZP" },
+  { stems: ["фетхие", "fethiye"], code: "DLM" },
+  { stems: ["бодрум", "bodrum"], code: "BJV" },
+  { stems: ["мармарис", "marmaris"], code: "DLM" },
+  { stems: ["тенериф", "tenerife"], code: "TFS" },
+  { stems: ["прага", "prague"], code: "PRG" },
+  { stems: ["будапешт", "budapest"], code: "BUD" },
+  { stems: ["милан", "milan"], code: "MIL" },
+  { stems: ["берлин", "berlin"], code: "BER" },
+];
 
 function findIATA(text: string): { origin: string | null; destination: string | null } {
   const lower = text.toLowerCase();
   const found: string[] = [];
 
-  // Sort by key length descending to match longer names first
-  const sorted = Object.entries(CITY_IATA).sort((a, b) => b[0].length - a[0].length);
-  for (const [name, code] of sorted) {
-    if (lower.includes(name) && !found.includes(code)) {
-      found.push(code);
-      if (found.length >= 2) break;
+  // Sort by stem length descending to match longer names first
+  const sorted = [...CITY_STEMS].sort((a, b) => {
+    const maxA = Math.max(...a.stems.map(s => s.length));
+    const maxB = Math.max(...b.stems.map(s => s.length));
+    return maxB - maxA;
+  });
+
+  for (const { stems, code } of sorted) {
+    if (found.includes(code)) continue;
+    for (const stem of stems) {
+      if (lower.includes(stem)) {
+        found.push(code);
+        break;
+      }
     }
+    if (found.length >= 2) break;
   }
 
   // If only destination found, assume Moscow as origin
@@ -136,6 +160,7 @@ export async function POST(req: Request) {
 
   if (lastUserMsg) {
     const { origin, destination } = findIATA(lastUserMsg.content);
+    console.log("[chat] detected cities:", origin, "→", destination, "from:", lastUserMsg.content.slice(0, 50));
     if (origin && destination) {
       // Try to extract month from message
       const monthMatch = lastUserMsg.content.match(/(?:январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)\S*/i);
