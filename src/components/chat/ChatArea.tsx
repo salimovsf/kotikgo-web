@@ -2,11 +2,43 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { renderWidget } from "./widgets";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+}
+
+/* Parse AI text into segments: plain text or widget blocks */
+function parseContent(content: string): Array<{ type: "text"; text: string } | { type: "widget"; kind: string; data: Record<string, unknown> }> {
+  const segments: Array<{ type: "text"; text: string } | { type: "widget"; kind: string; data: Record<string, unknown> }> = [];
+  const lines = content.split("\n");
+  let textBuffer = "";
+
+  for (const line of lines) {
+    const widgetMatch = line.match(/^\[widget:(\w+)\](.+)$/);
+    if (widgetMatch) {
+      if (textBuffer.trim()) {
+        segments.push({ type: "text", text: textBuffer.trim() });
+        textBuffer = "";
+      }
+      try {
+        const data = JSON.parse(widgetMatch[2]);
+        segments.push({ type: "widget", kind: widgetMatch[1], data });
+      } catch {
+        textBuffer += line + "\n";
+      }
+    } else {
+      textBuffer += line + "\n";
+    }
+  }
+
+  if (textBuffer.trim()) {
+    segments.push({ type: "text", text: textBuffer.trim() });
+  }
+
+  return segments;
 }
 
 export function ChatArea() {
@@ -110,32 +142,55 @@ export function ChatArea() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-7">
         <div className="max-w-[700px] mx-auto px-5 flex flex-col gap-5">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "gap-2.5 items-start"}`}>
-              {msg.role === "assistant" && (
+          {messages.map((msg) => {
+            if (msg.role === "user") {
+              return (
+                <div key={msg.id} className="flex justify-end">
+                  <div className="max-w-[580px]">
+                    <div className="rounded-2xl rounded-br-sm px-4 py-3 text-sm leading-relaxed bg-[var(--accent)] text-white whitespace-pre-wrap">
+                      {msg.content}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            /* Assistant message — parse for widgets */
+            const segments = parseContent(msg.content);
+
+            return (
+              <div key={msg.id} className="flex gap-2.5 items-start">
                 <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center text-xs text-white shrink-0 mt-0.5">
                   🐱
                 </div>
-              )}
-              <div className="max-w-[580px]">
-                <div
-                  className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
-                    msg.role === "user"
-                      ? "bg-[var(--accent)] text-white rounded-br-sm"
-                      : "bg-[var(--bg)] text-[var(--text)] rounded-bl-sm"
-                  }`}
-                >
-                  {msg.content || (
-                    <span className="flex gap-1">
-                      <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </span>
+                <div className="max-w-[580px] flex flex-col gap-2 flex-1 min-w-0">
+                  {segments.length === 0 && !msg.content ? (
+                    /* Loading dots */
+                    <div className="bg-[var(--bg)] rounded-2xl rounded-bl-sm px-4 py-3">
+                      <span className="flex gap-1">
+                        <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-2 h-2 bg-[var(--text-3)] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </span>
+                    </div>
+                  ) : (
+                    segments.map((seg, i) =>
+                      seg.type === "text" ? (
+                        <div
+                          key={i}
+                          className="bg-[var(--bg)] text-[var(--text)] rounded-2xl rounded-bl-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap"
+                        >
+                          {seg.text}
+                        </div>
+                      ) : (
+                        <div key={i}>{renderWidget(seg.kind, seg.data)}</div>
+                      )
+                    )
                   )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
       </div>
