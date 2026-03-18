@@ -1,3 +1,102 @@
+// IATA codes for common cities (for resolving city names to codes)
+const CITY_IATA: Record<string, string> = {
+  "москва": "MOW", "moscow": "MOW",
+  "петербург": "LED", "санкт-петербург": "LED", "питер": "LED",
+  "стамбул": "IST", "istanbul": "IST",
+  "анталья": "AYT", "анталия": "AYT", "antalya": "AYT",
+  "бали": "DPS", "денпасар": "DPS", "bali": "DPS",
+  "бангкок": "BKK", "bangkok": "BKK",
+  "пхукет": "HKT", "phuket": "HKT",
+  "дубай": "DXB", "dubai": "DXB",
+  "барселона": "BCN", "barcelona": "BCN",
+  "рим": "FCO", "rome": "FCO",
+  "париж": "PAR", "paris": "PAR",
+  "лондон": "LON", "london": "LON",
+  "мальдивы": "MLE", "мале": "MLE", "maldives": "MLE",
+  "шри-ланка": "CMB", "коломбо": "CMB",
+  "гоа": "GOA", "goa": "GOA",
+  "тбилиси": "TBS", "tbilisi": "TBS",
+  "ереван": "EVN", "yerevan": "EVN",
+  "алматы": "ALA", "almaty": "ALA",
+  "ташкент": "TAS", "tashkent": "TAS",
+  "сочи": "AER", "sochi": "AER",
+  "казань": "KZN", "kazan": "KZN",
+  "афины": "ATH", "athens": "ATH",
+  "каир": "CAI", "cairo": "CAI",
+  "хургада": "HRG", "hurghada": "HRG",
+  "шарм": "SSH", "шарм-эль-шейх": "SSH",
+  "канкун": "CUN", "cancun": "CUN",
+  "сеул": "SEL", "seoul": "SEL",
+  "токио": "TYO", "tokyo": "TYO",
+  "сингапур": "SIN", "singapore": "SIN",
+  "нячанг": "NHA", "хошимин": "SGN", "ханой": "HAN",
+  "куала-лумпур": "KUL",
+  "екатеринбург": "SVX", "новосибирск": "OVB",
+};
+
+function findIATA(text: string): { origin: string | null; destination: string | null } {
+  const lower = text.toLowerCase();
+  const found: string[] = [];
+
+  // Sort by key length descending to match longer names first
+  const sorted = Object.entries(CITY_IATA).sort((a, b) => b[0].length - a[0].length);
+  for (const [name, code] of sorted) {
+    if (lower.includes(name) && !found.includes(code)) {
+      found.push(code);
+      if (found.length >= 2) break;
+    }
+  }
+
+  // If only destination found, assume Moscow as origin
+  if (found.length === 1) {
+    return { origin: "MOW", destination: found[0] };
+  }
+  if (found.length >= 2) {
+    return { origin: found[0], destination: found[1] };
+  }
+  return { origin: null, destination: null };
+}
+
+// Fetch real prices from Travelpayouts
+async function fetchFlights(origin: string, destination: string, month?: string): Promise<string> {
+  const token = process.env.TRAVELPAYOUTS_TOKEN;
+  if (!token) return "";
+
+  const params = new URLSearchParams({
+    origin,
+    destination,
+    currency: "RUB",
+    token,
+    group_by: "departure_at",
+    sorting: "price",
+    limit: "5",
+  });
+
+  if (month) params.set("departure_at", month);
+
+  try {
+    const res = await fetch(`https://api.travelpayouts.com/aviasales/v3/grouped_prices?${params}`);
+    if (!res.ok) return "";
+
+    const data = await res.json();
+    if (!data.success || !data.data) return "";
+
+    const flights = Object.values(data.data)
+      .map((f: unknown) => {
+        const fl = f as Record<string, unknown>;
+        const stops = fl.transfers === 0 ? "прямой" : `${fl.transfers} пересадка`;
+        return `- ${fl.airline} ${fl.flight_number}: ${fl.price} ₽, ${fl.departure_at}, ${stops}`;
+      })
+      .slice(0, 5);
+
+    if (flights.length === 0) return "";
+
+    return `\n\nREAL FLIGHT PRICES from Travelpayouts (${origin} → ${destination}):\n${flights.join("\n")}\nUse these REAL prices in your flight widget. The affiliate link for buying: https://www.aviasales.ru/search/${origin}${destination}`;
+  } catch {
+    return "";
+  }
+}
+
 const SYSTEM_PROMPT = `You are KotikGo — a friendly AI travel assistant. You help people plan trips anywhere in the world.
 
 CRITICAL: When recommending services (flights, transfers, hotels, eSIM, insurance), you MUST output special widget blocks. These are rendered as interactive cards in the UI.
@@ -7,23 +106,22 @@ Widget format — place each on its own line:
 
 [widget:transfer]{"from":"Аэропорт","to":"Отель","best":{"type":"Sedan","passengers":"4","price":"от $18"},"variants":[{"type":"Minivan","passengers":"7","price":"от $28"},{"type":"Minibus","passengers":"19","price":"от $45"}]}
 
-[widget:hotel]{"location":"Убуд","nights":"14 ночей","best":{"name":"Villa Harmony","rating":"4.8","area":"центр Убуда","price":"от $32/ночь"},"variants":[{"name":"Rice Terrace Inn","rating":"4.6","area":"рисовые террасы","price":"от $28/ночь"},{"name":"Jungle Retreat","rating":"4.9","area":"лес","price":"от $45/ночь"}]}
+[widget:hotel]{"location":"Убуд","nights":"14 ночей","best":{"name":"Villa Harmony","rating":"4.8","area":"центр","price":"от $32/ночь"},"variants":[{"name":"Rice Terrace Inn","rating":"4.6","area":"террасы","price":"от $28/ночь"},{"name":"Jungle Retreat","rating":"4.9","area":"лес","price":"от $45/ночь"}]}
 
 [widget:esim]{"country":"Индонезия","best":{"operator":"Telkomsel","gb":"15","days":"14","price":"$9"},"variants":[{"operator":"XL Axiata","gb":"8","days":"14","price":"$6"},{"operator":"Telkomsel","gb":"30","days":"14","price":"$15"}]}
 
 [widget:insurance]{"days":"14","best":{"name":"Базовая","coverage":"$50 000","includes":"стандарт","price":"$22"},"variants":[{"name":"Расширенная","coverage":"$100 000","includes":"водные виды спорта","price":"$35"},{"name":"Премиум","coverage":"$200 000","includes":"всё + отмена рейса","price":"$55"}]}
 
-[widget:checklist]{"items":[{"text":"Виза — не нужна до 30 дней","done":true},{"text":"Билеты","done":false},{"text":"Трансфер","done":false},{"text":"Жильё","done":false},{"text":"eSIM","done":false},{"text":"Страховка","done":false}]}
+[widget:checklist]{"items":[{"text":"Виза — не нужна до 30 дней","done":true},{"text":"Билеты","done":false},{"text":"Трансфер","done":false}]}
 
-[widget:info]{"items":[{"label":"Виза","value":"не нужна до 30 дней"},{"label":"Валюта","value":"IDR (рупия)"},{"label":"Розетки","value":"тип C, переходник не нужен"},{"label":"Язык","value":"индонезийский, English"}]}
+[widget:info]{"items":[{"label":"Виза","value":"не нужна"},{"label":"Валюта","value":"IDR"},{"label":"Розетки","value":"тип C"}]}
 
-Rules:
-- Output widgets ONLY when relevant (user asks about a trip, flights, hotels, etc.)
-- For casual questions (restaurants, tips, weather) just answer with plain text, no widgets
-- Put text BEFORE and BETWEEN widgets to explain context
-- The JSON must be valid and on ONE line after the [widget:type] tag
-- Always provide at least 2 variants in addition to the best option
-- Prices should be approximate but realistic
+IMPORTANT RULES:
+- When REAL FLIGHT PRICES are provided in the context (from Travelpayouts), use THOSE exact prices in the flights widget — they are real and current
+- Output widgets ONLY when relevant
+- For casual questions (restaurants, tips) answer with plain text only
+- JSON must be valid and on ONE line after [widget:type]
+- Always 2+ variants in addition to the best
 - Answer in the same language the user writes in
 - Be friendly but concise`;
 
@@ -31,6 +129,37 @@ export const runtime = "edge";
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
+
+  // Check last user message for city names → fetch real prices
+  const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === "user");
+  let flightContext = "";
+
+  if (lastUserMsg) {
+    const { origin, destination } = findIATA(lastUserMsg.content);
+    if (origin && destination) {
+      // Try to extract month from message
+      const monthMatch = lastUserMsg.content.match(/(?:январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)\S*/i);
+      const monthMap: Record<string, string> = {
+        "январ": "01", "феврал": "02", "март": "03", "апрел": "04",
+        "май": "05", "мая": "05", "июн": "06", "июл": "07",
+        "август": "08", "сентябр": "09", "октябр": "10", "ноябр": "11", "декабр": "12",
+      };
+      let month: string | undefined;
+      if (monthMatch) {
+        const m = monthMatch[0].toLowerCase().slice(0, 6);
+        for (const [key, val] of Object.entries(monthMap)) {
+          if (m.startsWith(key)) {
+            month = `2026-${val}`;
+            break;
+          }
+        }
+      }
+
+      flightContext = await fetchFlights(origin, destination, month);
+    }
+  }
+
+  const systemContent = SYSTEM_PROMPT + flightContext;
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -42,7 +171,7 @@ export async function POST(req: Request) {
       model: "google/gemini-2.0-flash-001",
       stream: true,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: systemContent },
         ...messages,
       ],
     }),
