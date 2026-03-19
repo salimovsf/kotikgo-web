@@ -189,7 +189,7 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
         const dateFormatted = formatDateRu(depAt);
         const timeFormatted = formatTimeFromISO(depAt);
         const gate = fl.gate || "Aviasales";
-        const link = fl.link ? `https://www.aviasales.ru${fl.link}&marker=509198` : "";
+        const link = fl.link ? `https://www.aviasales.ru${fl.link}&marker=567508` : "";
         const price = fl.price as number;
 
         return { airlineName, price, dateFormatted, timeFormatted, depAirport, arrAirport, duration, stops, gate, link };
@@ -210,7 +210,7 @@ If user asked for a SPECIFIC date, show ONLY flights on that date. If no exact d
 ${flights.join("\n")}
 
 IMPORTANT: Use these EXACT prices and airline names in the flights widget. Show the first one as "best", next 9 as "variants". Include airline full name (not code), airport names, duration, departure time, and number of stops.
-Set "more_link" to exactly: "https://www.aviasales.ru/search/${origin}${destination}?marker=509198"
+Set "more_link" to exactly: "https://www.aviasales.ru/search/${origin}${destination}?marker=567508"
 For each flight's "link" field, use the BuyLink from the data above. If BuyLink is empty, omit the link field.`;
   } catch {
     return "";
