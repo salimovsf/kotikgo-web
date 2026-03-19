@@ -63,9 +63,15 @@ function formatDepDate(raw: string): string {
   return raw;
 }
 
-function FlightRow({ f, compact }: { f: FlightInfo; compact?: boolean }) {
+function isValidLink(link?: string): boolean {
+  if (!link) return false;
+  return link.startsWith("https://www.aviasales.ru/search/") && link.length > 40;
+}
+
+function FlightRow({ f, compact, fallbackLink }: { f: FlightInfo; compact?: boolean; fallbackLink?: string }) {
   const dep = formatDepDate(f.departure || "");
   const duration = f.duration || f.time || "";
+  const buyLink = isValidLink(f.link) ? f.link! : fallbackLink;
 
   return (
     <div className={`flex items-center gap-2.5 ${compact ? "px-3 py-2" : "p-3"} hover:bg-[var(--bg)] transition-colors`}>
@@ -82,8 +88,8 @@ function FlightRow({ f, compact }: { f: FlightInfo; compact?: boolean }) {
         </div>
       </div>
       <div className="text-[13px] font-extrabold text-[var(--accent)] shrink-0 whitespace-nowrap">{f.price}</div>
-      {f.link ? (
-        <a href={f.link} target="_blank" rel="noopener noreferrer"
+      {buyLink ? (
+        <a href={buyLink} target="_blank" rel="noopener noreferrer"
           className="shrink-0 bg-[var(--bg)] border border-[var(--border)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all">
           Купить →
         </a>
@@ -109,7 +115,7 @@ export function FlightsWidget({ data }: WidgetProps) {
           <span className="text-sm">✈️</span>
           <span className="text-[12px] font-bold text-[var(--text)]">{data.from as string} → {data.to as string}</span>
         </div>
-        <FlightRow f={best} />
+        <FlightRow f={best} fallbackLink={moreLink} />
       </div>
 
       {/* Toggle */}
@@ -125,7 +131,7 @@ export function FlightsWidget({ data }: WidgetProps) {
         <div className="border-t border-[var(--border)]">
           {variants.map((v, i) => (
             <div key={i} className="border-b border-[var(--border)] last:border-b-0">
-              <FlightRow f={v} compact />
+              <FlightRow f={v} compact fallbackLink={moreLink} />
             </div>
           ))}
 

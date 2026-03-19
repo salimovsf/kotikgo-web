@@ -209,7 +209,9 @@ IMPORTANT: Use the "Date Time" field exactly as shown (e.g. "25 марта 08:30
 If user asked for a SPECIFIC date, show ONLY flights on that date. If no exact date match, show closest dates and mention it.
 ${flights.join("\n")}
 
-IMPORTANT: Use these EXACT prices and airline names in the flights widget. Show the first one as "best", next 9 as "variants". Include airline full name (not code), airport names, duration, departure time, and number of stops. The "Ещё рейсы" link: https://www.aviasales.ru/search/${origin}${destination}`;
+IMPORTANT: Use these EXACT prices and airline names in the flights widget. Show the first one as "best", next 9 as "variants". Include airline full name (not code), airport names, duration, departure time, and number of stops.
+Set "more_link" to exactly: "https://www.aviasales.ru/search/${origin}${destination}"
+For each flight's "link" field, use the BuyLink from the data above. If BuyLink is empty, omit the link field.`;
   } catch {
     return "";
   }
