@@ -215,7 +215,15 @@ IMPORTANT: Use these EXACT prices and airline names in the flights widget. Show 
   }
 }
 
-const SYSTEM_PROMPT = `You are KotikGo — a friendly AI travel assistant. You help people plan trips anywhere in the world.
+function getSystemPrompt() {
+  const now = new Date();
+  const day = now.getDate();
+  const months = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+  const todayStr = `${day} ${months[now.getMonth()]} ${now.getFullYear()}`;
+
+  return `You are KotikGo — a friendly AI travel assistant. You help people plan trips anywhere in the world.
+
+TODAY'S DATE: ${todayStr}. Use this to understand relative dates like "завтра" (tomorrow), "послезавтра" (day after tomorrow), "через неделю" (in a week), "в следующем месяце" (next month).
 
 CRITICAL RULES FOR ORIGIN CITY:
 - If the user does NOT mention where they're flying FROM, you MUST ask: "Откуда планируете вылет?" (or in the user's language)
@@ -257,6 +265,7 @@ IMPORTANT:
 - Use markdown for text formatting (bold, lists) but NOT inside widget JSON
 - Be friendly but concise
 - Do NOT output [widget:checklist] — it is deprecated`;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -281,15 +290,40 @@ export async function POST(req: Request) {
       let dateStr: string | undefined;
       const text = lastUserMsg.content.toLowerCase();
 
+      // Helper: format date to YYYY-MM-DD
+      function toDateStr(d: Date): string {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      }
+
+      // Relative dates: "завтра", "послезавтра", "через N дней"
+      const now = new Date();
+      if (text.includes("завтра") && !text.includes("послезавтра")) {
+        const d = new Date(now); d.setDate(d.getDate() + 1);
+        dateStr = toDateStr(d);
+      } else if (text.includes("послезавтра")) {
+        const d = new Date(now); d.setDate(d.getDate() + 2);
+        dateStr = toDateStr(d);
+      } else if (text.includes("сегодня")) {
+        dateStr = toDateStr(now);
+      }
+
+      const throughDays = text.match(/через\s+(\d+)\s+дн/);
+      if (throughDays) {
+        const d = new Date(now); d.setDate(d.getDate() + parseInt(throughDays[1]));
+        dateStr = toDateStr(d);
+      }
+
       // Try exact date: "25 марта", "3 мая"
-      const exactMatch = text.match(/(\d{1,2})\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)/i);
-      if (exactMatch) {
-        const day = exactMatch[1].padStart(2, "0");
-        const monthWord = exactMatch[0].replace(/\d+\s*/, "").trim().slice(0, 6);
-        for (const [key, val] of Object.entries(monthMap)) {
-          if (monthWord.startsWith(key)) {
-            dateStr = `2026-${val}-${day}`;
-            break;
+      if (!dateStr) {
+        const exactMatch = text.match(/(\d{1,2})\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)/i);
+        if (exactMatch) {
+          const day = exactMatch[1].padStart(2, "0");
+          const monthWord = exactMatch[0].replace(/\d+\s*/, "").trim().slice(0, 6);
+          for (const [key, val] of Object.entries(monthMap)) {
+            if (monthWord.startsWith(key)) {
+              dateStr = `${now.getFullYear()}-${val}-${day}`;
+              break;
+            }
           }
         }
       }
@@ -301,7 +335,7 @@ export async function POST(req: Request) {
           const m = monthMatch[0].slice(0, 6);
           for (const [key, val] of Object.entries(monthMap)) {
             if (m.startsWith(key)) {
-              dateStr = `2026-${val}`;
+              dateStr = `${now.getFullYear()}-${val}`;
               break;
             }
           }
@@ -331,7 +365,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const systemContent = SYSTEM_PROMPT + flightContext;
+  const systemContent = getSystemPrompt() + flightContext;
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
