@@ -73,13 +73,17 @@ export function ChatArea({
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const justCreatedRef = useRef(false);
 
-  // Load messages when chatId changes
+  // Load messages when chatId changes (but skip if we just created this chat)
   useEffect(() => {
     if (!chatId) {
       setMessages([]);
-      setLoaded(true);
+      return;
+    }
+
+    if (justCreatedRef.current) {
+      justCreatedRef.current = false;
       return;
     }
 
@@ -95,9 +99,8 @@ export function ChatArea({
             }))
           );
         }
-        setLoaded(true);
       })
-      .catch(() => setLoaded(true));
+      .catch(() => {});
   }, [chatId]);
 
   useEffect(() => {
@@ -120,6 +123,7 @@ export function ChatArea({
     if (!cId) {
       cId = await createChat();
       if (!cId) return;
+      justCreatedRef.current = true;
       onChatCreated(cId);
     }
 
