@@ -46,8 +46,25 @@ interface FlightInfo {
   time?: string; // fallback
 }
 
+const MONTHS_RU = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+
+function formatDepDate(raw: string): string {
+  if (!raw) return "";
+  // Already in Russian format like "3 мая 10:00"
+  if (/[а-яё]/i.test(raw)) return raw;
+  // ISO-like: "2026-05-03 10:00" or "2026-05-03T10:00"
+  const match = raw.match(/(\d{4})-(\d{2})-(\d{2})[T ]?(\d{2}:\d{2})?/);
+  if (match) {
+    const day = parseInt(match[3], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const time = match[4] || "";
+    return `${day} ${MONTHS_RU[month] || ""}${time ? " " + time : ""}`;
+  }
+  return raw;
+}
+
 function FlightRow({ f, compact }: { f: FlightInfo; compact?: boolean }) {
-  const dep = f.departure || "";
+  const dep = formatDepDate(f.departure || "");
   const duration = f.duration || f.time || "";
 
   return (
