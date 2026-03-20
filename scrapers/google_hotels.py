@@ -175,30 +175,41 @@ async def _parse_hotel_card(card, page) -> dict:
 
     # Price — look for currency patterns
     price_patterns = [
-        r"([\d\s]+)\s*₽",           # Russian Ruble
-        r"\$([\d\s]+)",              # USD
-        r"€([\d\s]+)",              # EUR
-        r"([\d\s]+)\s*руб",         # руб
-        r"([\d,]+)\s*₺",           # Turkish Lira
+        (r"([\d\s.,]+)\s*₽", "RUB"),
+        (r"([\d\s.,]+)\s*руб", "RUB"),
+        (r"([\d\s.,]+)\s*RUB", "RUB"),
+        (r"([\d\s.,]+)\s*TRY", "TRY"),
+        (r"([\d\s.,]+)\s*₺", "TRY"),
+        (r"\$\s*([\d\s.,]+)", "USD"),
+        (r"([\d\s.,]+)\s*USD", "USD"),
+        (r"€\s*([\d\s.,]+)", "EUR"),
+        (r"([\d\s.,]+)\s*EUR", "EUR"),
     ]
-    for pattern in price_patterns:
+    for pattern, curr in price_patterns:
         price_match = re.search(pattern, text)
         if price_match:
-            price_str = price_match.group(1).replace(" ", "").replace(",", "")
+            price_str = price_match.group(1).strip().replace(" ", "").replace(",", "").replace(".", "")
             try:
                 hotel["price"] = int(price_str)
-                # Determine currency from pattern
-                if "₽" in pattern or "руб" in pattern:
-                    hotel["currency"] = "RUB"
-                elif "$" in pattern:
-                    hotel["currency"] = "USD"
-                elif "€" in pattern:
-                    hotel["currency"] = "EUR"
-                elif "₺" in pattern:
-                    hotel["currency"] = "TRY"
+                hotel["currency"] = curr
             except:
                 pass
             break
+
+    # Amenities
+    amenities_keywords = [
+        "Бесплатный Wi-Fi", "Wi-Fi", "Бассейн", "Парковка", "Бесплатная парковка",
+        "Кондиционер", "Ресторан", "Завтрак", "Бесплатный завтрак", "Спа",
+        "Фитнес", "Пляж", "Трансфер", "Прачечная", "Кухня", "Бар",
+        "Free Wi-Fi", "Pool", "Parking", "Free parking", "AC", "Restaurant",
+        "Breakfast", "Free breakfast", "Spa", "Gym", "Beach", "Kitchen",
+    ]
+    found_amenities = []
+    for kw in amenities_keywords:
+        if kw.lower() in text.lower():
+            found_amenities.append(kw)
+    if found_amenities:
+        hotel["amenities"] = found_amenities[:6]  # max 6
 
     # Source (where the price is from)
     for source in ["Booking.com", "Agoda", "Trip.com", "Ostrovok", "Hotels.com", "Expedia"]:
