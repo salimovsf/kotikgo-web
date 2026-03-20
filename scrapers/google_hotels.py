@@ -99,8 +99,11 @@ async def search_hotels(city: str, check_in: str, check_out: str, adults: int = 
             pass
 
         # Wait for hotel cards to load
-        await page.wait_for_selector('[class*="property"]', timeout=10000).catch(lambda _: None)
-        await asyncio.sleep(2)
+        try:
+            await page.wait_for_selector('[class*="property"]', timeout=10000)
+        except:
+            pass
+        await asyncio.sleep(3)
 
         # Parse hotel cards
         # Google Hotels uses different selectors, try multiple approaches
