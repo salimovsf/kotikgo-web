@@ -59,25 +59,19 @@ async def scrape_hotels(city_filter: str = None, dry_run: bool = False):
                 elif "1-star" in sub or "1 star" in sub:
                     place["stars"] = 1
 
-                # Set defaults for missing fields
-                place.setdefault("name_ru", None)
-                place.setdefault("name_local", None)
-                place.setdefault("district", None)
-                place.setdefault("lat", None)
-                place.setdefault("lng", None)
-                place.setdefault("rating", None)
-                place.setdefault("reviews_count", 0)
-                place.setdefault("price_level", None)
-                place.setdefault("phone", None)
-                place.setdefault("website", None)
-                place.setdefault("hours", None)
-                place.setdefault("photos", [])
-                place.setdefault("description", None)
-                place.setdefault("amenities", [])
-                place.setdefault("cuisine", [])
-                place.setdefault("stars", None)
-                place.setdefault("avg_check", None)
-                place.setdefault("tripadvisor_key", None)
+                # Set defaults for ALL fields
+                defaults = {
+                    "name_ru": None, "name_local": None, "district": None,
+                    "address": None, "lat": None, "lng": None,
+                    "rating": None, "reviews_count": 0,
+                    "price_level": None, "phone": None, "website": None,
+                    "hours": None, "photos": [], "description": None,
+                    "amenities": [], "cuisine": [], "stars": None,
+                    "avg_check": None, "tripadvisor_key": None,
+                    "subcategory": None, "google_maps_url": None,
+                }
+                for k, v in defaults.items():
+                    place.setdefault(k, v)
 
                 upsert_place(place)
                 saved += 1
