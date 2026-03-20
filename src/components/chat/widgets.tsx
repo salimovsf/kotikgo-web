@@ -91,7 +91,7 @@ function FlightRow({ f, compact, fallbackLink }: { f: FlightInfo; compact?: bool
       {buyLink ? (
         <a href={buyLink} target="_blank" rel="noopener noreferrer"
           className="shrink-0 bg-[var(--bg)] border border-[var(--border)] text-[var(--text-2)] hover:border-[var(--accent)] hover:text-[var(--accent)] text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all">
-          Купить →
+          Проверить цену →
         </a>
       ) : (
         <ActionButton text="Купить →" type="link" />
@@ -135,13 +135,19 @@ export function FlightsWidget({ data }: WidgetProps) {
             </div>
           ))}
 
-          {/* More flights link */}
-          {moreLink && (
-            <a href={moreLink} target="_blank" rel="noopener noreferrer"
-              className="block text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors border-t border-[var(--border)]">
-              Ещё рейсы на Aviasales →
+          {/* More flights links */}
+          <div className="border-t border-[var(--border)] flex">
+            <a href={`/ru/flights?from=${encodeURIComponent(data.from as string || "")}&to=${encodeURIComponent(data.to as string || "")}`}
+              className="flex-1 text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors">
+              Поиск с реальными ценами →
             </a>
-          )}
+            {moreLink && (
+              <a href={moreLink} target="_blank" rel="noopener noreferrer"
+                className="flex-1 text-center py-2.5 text-[12px] font-bold text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--bg)] transition-colors border-l border-[var(--border)]">
+                На Aviasales →
+              </a>
+            )}
+          </div>
         </div>
       )}
     </div>
