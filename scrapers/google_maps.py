@@ -85,72 +85,68 @@ async def parse_search_results(page: Page) -> list[dict]:
     """Parse all visible place cards from search results."""
     places = []
 
-    cards = await page.query_selector_all('div[role="feed"] > div > div > a[href*="/maps/place/"]')
+    cards = await page.query_selector_all('a.hfpxzc')
     log.info(f"  Found {len(cards)} place cards")
 
     for card in cards:
         try:
             place = {}
 
-            # Name
-            name_el = await card.query_selector("[class*='fontHeadlineSmall']")
-            if name_el:
-                place["name_en"] = (await name_el.inner_text()).strip()
-            else:
+            # Name from aria-label
+            aria_label = await card.get_attribute("aria-label") or ""
+            if not aria_label:
                 continue
+            place["name_en"] = aria_label.strip()
 
             # URL & place_id
             href = await card.get_attribute("href") or ""
             place["google_maps_url"] = href
 
-            # Extract place_id from URL
-            place_id_match = re.search(r"place_id[=:]([A-Za-z0-9_-]+)", href)
+            # Extract place_id from URL (data=!...!1sChIJ...)
+            place_id_match = re.search(r"1s(0x[0-9a-f]+:[0-9a-fx]+)", href)
             if place_id_match:
                 place["google_place_id"] = place_id_match.group(1)
             else:
-                # Use URL hash as fallback ID
-                place["google_place_id"] = str(hash(href))[:20]
+                place["google_place_id"] = str(abs(hash(href)))
 
-            # Rating & reviews
-            rating_el = await card.query_selector("span[role='img']")
-            if rating_el:
-                aria = await rating_el.get_attribute("aria-label") or ""
-                rating_match = re.search(r"([\d.]+)\s*star", aria)
-                if rating_match:
-                    place["rating"] = float(rating_match.group(1))
-                reviews_match = re.search(r"([\d,]+)\s*review", aria)
-                if reviews_match:
-                    place["reviews_count"] = int(reviews_match.group(1).replace(",", ""))
+            # Parent container has rating, reviews, category, address
+            parent = await card.evaluate_handle("el => el.parentElement")
 
-            # Subcategory (e.g. "4-star hotel", "Italian restaurant")
-            spans = await card.query_selector_all("span")
-            for span in spans:
-                text = (await span.inner_text()).strip()
-                if text and text != place.get("name_en") and len(text) < 100:
-                    if any(kw in text.lower() for kw in ["hotel", "restaurant", "cafe", "bar", "museum", "beach", "hospital", "pharmacy", "airport", "station", "mall", "market"]):
-                        place["subcategory"] = text
-                        break
+            # Rating & reviews from parent
+            parent_text = await parent.evaluate("el => el.innerText")
+
+            rating_match = re.search(r"(\d\.\d)\s*\(", parent_text)
+            if not rating_match:
+                rating_match = re.search(r"(\d\.\d)", parent_text)
+            if rating_match:
+                place["rating"] = float(rating_match.group(1))
+
+            reviews_match = re.search(r"\(([\d,]+)\)", parent_text)
+            if reviews_match:
+                place["reviews_count"] = int(reviews_match.group(1).replace(",", ""))
+
+            # Subcategory and address from text lines
+            lines = [l.strip() for l in parent_text.split("\n") if l.strip() and l.strip() != aria_label.strip()]
+            for line in lines:
+                if any(kw in line.lower() for kw in ["hotel", "resort", "hostel", "restaurant", "cafe", "bar", "museum", "beach", "hospital", "pharmacy", "airport", "station", "mall", "market", "star", "club"]):
+                    place["subcategory"] = line
+                elif len(line) > 15 and not re.match(r"^[\d.(,)]+$", line) and "·" not in line[:3]:
+                    if "address" not in place:
+                        place["address"] = line
 
             # Price level
-            price_el = await card.query_selector("span:has-text('$')")
-            if price_el:
-                price_text = (await price_el.inner_text()).strip()
-                place["price_level"] = price_text.count("$") or price_text.count("₽")
+            price_match = re.search(r"([\$₽€]{1,4})\s*·", parent_text)
+            if price_match:
+                place["price_level"] = len(price_match.group(1))
 
-            # Address snippet
-            address_spans = await card.query_selector_all("[class*='fontBodyMedium'] span")
-            for span in address_spans:
-                text = (await span.inner_text()).strip()
-                if text and len(text) > 10 and not text.startswith("(") and "$" not in text:
-                    place["address"] = text
-                    break
-
-            # Photo
-            img = await card.query_selector("img[src*='googleusercontent']")
-            if img:
-                src = await img.get_attribute("src")
+            # Photo from sibling img
+            img = await parent.evaluate_handle("el => el.querySelector('img[src*=\"googleusercontent\"]')")
+            try:
+                src = await img.evaluate("el => el.src")
                 if src:
                     place["photos"] = [src]
+            except:
+                pass
 
             places.append(place)
 
