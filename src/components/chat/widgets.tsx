@@ -119,12 +119,14 @@ export function FlightsWidget({ data }: WidgetProps) {
       </div>
 
       {/* Toggle */}
-      <div className="px-3 py-2 flex justify-between items-center">
-        <span className="text-[10px] text-[var(--text-3)]">
-          {variants.length > 0 ? `Ещё ${variants.length} рейсов` : ""}
-        </span>
-        {variants.length > 0 && <ExpandButton expanded={expanded} onClick={() => setExpanded(!expanded)} />}
-      </div>
+      {variants.length > 0 && (
+        <div className="px-3 py-2 flex justify-between items-center">
+          <span className="text-[10px] text-[var(--text-3)]">
+            Ещё {variants.length} рейсов
+          </span>
+          <ExpandButton expanded={expanded} onClick={() => setExpanded(!expanded)} />
+        </div>
+      )}
 
       {/* Expanded variants */}
       {expanded && variants.length > 0 && (
@@ -134,22 +136,22 @@ export function FlightsWidget({ data }: WidgetProps) {
               <FlightRow f={v} compact fallbackLink={moreLink} />
             </div>
           ))}
-
-          {/* More flights links */}
-          <div className="border-t border-[var(--border)] flex">
-            <a href={`/ru/flights?from=${encodeURIComponent(data.from as string || "")}&to=${encodeURIComponent(data.to as string || "")}`}
-              className="flex-1 text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors">
-              Поиск с реальными ценами →
-            </a>
-            {moreLink && (
-              <a href={moreLink} target="_blank" rel="noopener noreferrer"
-                className="flex-1 text-center py-2.5 text-[12px] font-bold text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--bg)] transition-colors border-l border-[var(--border)]">
-                На Aviasales →
-              </a>
-            )}
-          </div>
         </div>
       )}
+
+      {/* Always show action links */}
+      <div className="border-t border-[var(--border)] flex">
+        <a href={`/ru/flights?from=${encodeURIComponent(data.from as string || "")}&to=${encodeURIComponent(data.to as string || "")}`}
+          className="flex-1 text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors">
+          Поиск с реальными ценами →
+        </a>
+        {moreLink && (
+          <a href={moreLink} target="_blank" rel="noopener noreferrer"
+            className="flex-1 text-center py-2.5 text-[12px] font-bold text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--bg)] transition-colors border-l border-[var(--border)]">
+            На Aviasales →
+          </a>
+        )}
+      </div>
     </div>
   );
 }
