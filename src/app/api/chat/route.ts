@@ -270,7 +270,8 @@ WIDGET FORMAT — each on its own line, JSON must be valid and complete on ONE l
 
 [widget:flights]{"from":"City","to":"City","best":{"airline":"Full Airline Name","dep_airport":"Airport","arr_airport":"Airport","departure":"2026-05-03 08:30","duration":"4ч 15м","stops":"прямой","price":"от 12 439 ₽","gate":"Aviasales","link":"https://..."},"variants":[...up to 9 more...],"more_link":"https://aviasales.ru/search/..."}
 [widget:transfer]{"from":"Аэропорт Анталья","to":"Каш","best":{"type":"Sedan","passengers":"4","price":"от $80"},"variants":[{"type":"Minivan","passengers":"7","price":"от $100"},{"type":"Minibus","passengers":"19","price":"от $150"}]}
-[widget:hotel]{"location":"Каш","nights":"7 ночей","best":{"name":"Hotel Name","rating":"4.8","area":"район","price":"от $40/ночь"},"variants":[...2+ more...]}
+[widget:hotel]{"location":"Kas Turkey","check_in":"2026-04-10","check_out":"2026-04-15","nights":"5 ночей","best":{"name":"Hotel Name","rating":"4.8","area":"район","price":"от $40/ночь"},"variants":[...2+ more...]}
+IMPORTANT for hotel widget: "location" must be in English (city + country) for API search. "check_in" and "check_out" must be YYYY-MM-DD format. Real prices will be loaded automatically from Google Hotels.
 [widget:esim]{"country":"Турция","best":{"operator":"Turkcell","gb":"10","days":"7","price":"$8"},"variants":[...2+ more...]}
 [widget:insurance]{"days":"7","best":{"name":"Базовая","coverage":"$50 000","includes":"стандарт","price":"$18"},"variants":[...2+ more...]}
 [widget:info]{"items":[{"label":"Виза","value":"не нужна до 30 дней"},{"label":"Валюта","value":"TRY (лира)"},{"label":"Розетки","value":"тип C/F"}]}

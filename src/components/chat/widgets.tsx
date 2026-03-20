@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface WidgetProps {
   data: Record<string, unknown>;
@@ -207,42 +207,179 @@ export function TransferWidget({ data }: WidgetProps) {
 }
 
 /* ═══════ HOTEL ═══════ */
+interface RealHotel {
+  name: string;
+  rating?: number;
+  price?: number;
+  currency?: string;
+  stars?: number;
+  photo?: string;
+  amenities?: string[];
+  reviews_count?: number;
+}
+
 export function HotelWidget({ data }: WidgetProps) {
   const [expanded, setExpanded] = useState(false);
-  const best = data.best as { name: string; rating: string; area: string; price: string };
-  const variants = (data.variants as typeof best[]) || [];
+  const [realHotels, setRealHotels] = useState<RealHotel[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
+  const location = data.location as string || "";
+  const checkIn = data.check_in as string || "";
+  const checkOut = data.check_out as string || "";
+
+  // Auto-fetch real prices on mount
+  useEffect(() => {
+    if (loaded || loading || !location) return;
+    setLoading(true);
+
+    fetch(`/api/hotels?city=${encodeURIComponent(location)}&check_in=${checkIn}&check_out=${checkOut}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.hotels && d.hotels.length > 0) {
+          setRealHotels(d.hotels);
+        }
+        setLoaded(true);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoaded(true);
+        setLoading(false);
+      });
+  }, [location, checkIn, checkOut, loaded, loading]);
+
+  // If real hotels loaded — show them
+  const hotels = realHotels || [];
+  const best = hotels[0];
+  const variants = hotels.slice(1);
+
+  // Fallback to AI data if no real hotels
+  const aiBest = data.best as { name: string; rating: string; area: string; price: string } | undefined;
+  const aiVariants = (data.variants as typeof aiBest[]) || [];
+
+  if (loading) {
+    return (
+      <div className="bg-white border border-[var(--border)] rounded-xl p-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">🏠</span>
+          <span className="text-[12px] font-bold text-[var(--text)]">Отели в {location}</span>
+        </div>
+        <div className="flex items-center gap-2 mt-2">
+          <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+          <span className="text-[12px] text-[var(--text-3)]">Ищу лучшие цены...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (best) {
+    // Real hotels with prices
+    return (
+      <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
+        <div className="px-3 pt-2.5 pb-1 flex items-center gap-1.5 border-b border-[var(--border)]">
+          <span className="text-sm">🏠</span>
+          <span className="text-[12px] font-bold text-[var(--text)]">Отели в {location}</span>
+          <span className="text-[10px] text-[var(--text-3)]">реальные цены</span>
+        </div>
+
+        {/* Best hotel */}
+        <div className="p-3 flex gap-3 items-start">
+          {best.photo && (
+            <img src={best.photo} alt={best.name} className="w-16 h-16 rounded-lg object-cover shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-bold text-[var(--text)]">{best.name}</div>
+            <div className="text-[11px] text-[var(--text-3)] mt-0.5">
+              {best.rating && <span>★{best.rating} </span>}
+              {best.stars && <span>{"⭐".repeat(best.stars)} </span>}
+              {best.amenities && best.amenities.length > 0 && (
+                <span>· {best.amenities.slice(0, 3).join(", ")}</span>
+              )}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-[14px] font-extrabold text-[var(--accent)]">
+              {best.price ? `${best.price.toLocaleString("ru")} ${best.currency || ""}` : ""}
+            </div>
+            <div className="text-[10px] text-[var(--text-3)]">за всё</div>
+          </div>
+        </div>
+
+        {/* Toggle */}
+        {variants.length > 0 && (
+          <div className="px-3 py-2 flex justify-between items-center border-t border-[var(--border)]">
+            <span className="text-[10px] text-[var(--text-3)]">Ещё {variants.length} отелей</span>
+            <ExpandButton expanded={expanded} onClick={() => setExpanded(!expanded)} />
+          </div>
+        )}
+
+        {/* Expanded */}
+        {expanded && variants.map((h, i) => (
+          <div key={i} className="flex items-center gap-2.5 px-3 py-2 border-t border-[var(--border)] hover:bg-[var(--bg)] transition-colors">
+            {h.photo && (
+              <img src={h.photo} alt={h.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] font-semibold text-[var(--text)]">{h.name}</div>
+              <div className="text-[11px] text-[var(--text-3)]">
+                {h.rating && <span>★{h.rating} </span>}
+                {h.amenities && h.amenities.length > 0 && h.amenities.slice(0, 2).join(", ")}
+              </div>
+            </div>
+            <div className="text-[12.5px] font-bold text-[var(--accent)] shrink-0">
+              {h.price ? `${h.price.toLocaleString("ru")} ${h.currency || ""}` : ""}
+            </div>
+          </div>
+        ))}
+
+        {/* Booking link */}
+        <div className="border-t border-[var(--border)]">
+          <a href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(location)}&checkin=${checkIn}&checkout=${checkOut}&aid=2369041`}
+            target="_blank" rel="noopener noreferrer"
+            className="block text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors">
+            Забронировать на Booking.com →
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback: AI-generated hotels (no real prices)
   return (
     <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
       <div className="flex items-center gap-2.5 p-3">
         <div className="w-8 h-8 rounded-lg bg-[var(--accent-bg)] flex items-center justify-center text-sm shrink-0">🏠</div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-bold text-[var(--text)]">{data.location as string} · {data.nights as string} ночей</div>
-          <div className="text-[11px] text-[var(--text-3)]">{best.name} · ★{best.rating} · {best.area}</div>
+          <div className="text-[12.5px] font-bold text-[var(--text)]">{location} · {data.nights as string || ""}</div>
+          {aiBest && <div className="text-[11px] text-[var(--text-3)]">{aiBest.name} · ★{aiBest.rating}</div>}
         </div>
-        <div className="text-[13px] font-extrabold text-[var(--accent)] shrink-0">{best.price}</div>
-        <ActionButton text="Смотреть →" type="link" />
+        {aiBest && <div className="text-[13px] font-extrabold text-[var(--accent)] shrink-0">{aiBest.price}</div>}
       </div>
 
-      <div className="px-3 pb-2 flex justify-between items-center">
-        <span className="text-[10px] text-[var(--text-3)]">{variants.length > 0 ? `Ещё ${variants.length} вариантов` : ""}</span>
-        {variants.length > 0 && <ExpandButton expanded={expanded} onClick={() => setExpanded(!expanded)} />}
-      </div>
-
-      {expanded && variants.length > 0 && (
-        <div className="border-t border-[var(--border)]">
-          {variants.map((v, i) => (
-            <div key={i} className="flex items-center gap-2.5 px-3 py-2.5 border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--bg)] transition-colors">
-              <div className="flex-1 min-w-0">
-                <div className="text-[12px] font-semibold text-[var(--text)]">{v.name}</div>
-                <div className="text-[11px] text-[var(--text-3)]">★{v.rating} · {v.area}</div>
-              </div>
-              <div className="text-[12.5px] font-bold text-[var(--text)] shrink-0">{v.price}</div>
-              <ActionButton text="Смотреть →" type="link" />
-            </div>
-          ))}
+      {aiVariants.length > 0 && (
+        <div className="px-3 pb-2 flex justify-between items-center">
+          <span className="text-[10px] text-[var(--text-3)]">Ещё {aiVariants.length} вариантов</span>
+          <ExpandButton expanded={expanded} onClick={() => setExpanded(!expanded)} />
         </div>
       )}
+
+      {expanded && aiVariants.map((v, i) => v && (
+        <div key={i} className="flex items-center gap-2.5 px-3 py-2.5 border-t border-[var(--border)] hover:bg-[var(--bg)]">
+          <div className="flex-1 min-w-0">
+            <div className="text-[12px] font-semibold text-[var(--text)]">{v.name}</div>
+            <div className="text-[11px] text-[var(--text-3)]">★{v.rating} · {v.area}</div>
+          </div>
+          <div className="text-[12.5px] font-bold text-[var(--text)] shrink-0">{v.price}</div>
+        </div>
+      ))}
+
+      <div className="border-t border-[var(--border)]">
+        <a href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(location)}&aid=2369041`}
+          target="_blank" rel="noopener noreferrer"
+          className="block text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors">
+          Смотреть на Booking.com →
+        </a>
+      </div>
     </div>
   );
 }
