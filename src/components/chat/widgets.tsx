@@ -63,6 +63,13 @@ function formatDepDate(raw: string): string {
   return raw;
 }
 
+const MARKER = "567508";
+
+function ensureMarker(link: string): string {
+  if (link.includes("marker=")) return link;
+  return link + (link.includes("?") ? "&" : "?") + `marker=${MARKER}`;
+}
+
 function isValidLink(link?: string): boolean {
   if (!link) return false;
   return link.includes("aviasales.ru/search/") && link.length > 35;
@@ -71,7 +78,8 @@ function isValidLink(link?: string): boolean {
 function FlightRow({ f, compact, fallbackLink }: { f: FlightInfo; compact?: boolean; fallbackLink?: string }) {
   const dep = formatDepDate(f.departure || "");
   const duration = f.duration || f.time || "";
-  const buyLink = isValidLink(f.link) ? f.link! : fallbackLink;
+  const rawLink = isValidLink(f.link) ? f.link! : fallbackLink;
+  const buyLink = rawLink ? ensureMarker(rawLink) : undefined;
 
   return (
     <div className={`flex items-center gap-2.5 ${compact ? "px-3 py-2" : "p-3"} hover:bg-[var(--bg)] transition-colors`}>
@@ -105,7 +113,8 @@ export function FlightsWidget({ data }: WidgetProps) {
   const [expanded, setExpanded] = useState(false);
   const best = data.best as FlightInfo;
   const variants = (data.variants as FlightInfo[]) || [];
-  const moreLink = data.more_link as string | undefined;
+  const rawMoreLink = data.more_link as string | undefined;
+  const moreLink = rawMoreLink ? ensureMarker(rawMoreLink) : undefined;
 
   return (
     <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
