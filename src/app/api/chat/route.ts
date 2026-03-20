@@ -57,31 +57,62 @@ function findIATA(text: string): { origin: string | null; destination: string | 
   const lower = text.toLowerCase();
 
   // Find all city matches with their position in text
-  const matches: Array<{ code: string; position: number }> = [];
+  const matches: Array<{ code: string; position: number; stem: string }> = [];
 
   for (const { stems, code } of CITY_STEMS) {
     if (matches.some(m => m.code === code)) continue;
     let earliest = Infinity;
+    let matchedStem = "";
     for (const stem of stems) {
       const pos = lower.indexOf(stem);
       if (pos !== -1 && pos < earliest) {
         earliest = pos;
+        matchedStem = stem;
       }
     }
     if (earliest < Infinity) {
-      matches.push({ code, position: earliest });
+      matches.push({ code, position: earliest, stem: matchedStem });
     }
   }
 
-  // Sort by position in text — first mentioned = origin, second = destination
-  matches.sort((a, b) => a.position - b.position);
+  if (matches.length < 1) return { origin: null, destination: null };
+
+  // Smart detection: look for "из X" (from) and "в X" / "на X" (to) patterns
+  if (matches.length >= 2) {
+    let origin: string | null = null;
+    let destination: string | null = null;
+
+    for (const m of matches) {
+      const before = lower.slice(Math.max(0, m.position - 5), m.position).trim();
+      if (before.endsWith("из") || before.endsWith("from")) {
+        origin = m.code;
+      } else if (before.endsWith("в") || before.endsWith("на") || before.endsWith("до") || before.endsWith("to") || before.endsWith("in")) {
+        destination = m.code;
+      }
+    }
+
+    // If we identified both, use them
+    if (origin && destination) {
+      return { origin, destination };
+    }
+
+    // If only one identified, the other is the remaining match
+    const codes = matches.map(m => m.code);
+    if (origin && !destination) {
+      return { origin, destination: codes.find(c => c !== origin) || null };
+    }
+    if (!origin && destination) {
+      return { origin: codes.find(c => c !== destination) || null, destination };
+    }
+
+    // Fallback: first mentioned = origin, second = destination
+    matches.sort((a, b) => a.position - b.position);
+    return { origin: matches[0].code, destination: matches[1].code };
+  }
 
   // If only one city found, don't assume origin — AI will ask
   if (matches.length === 1) {
     return { origin: null, destination: matches[0].code };
-  }
-  if (matches.length >= 2) {
-    return { origin: matches[0].code, destination: matches[1].code };
   }
   return { origin: null, destination: null };
 }
