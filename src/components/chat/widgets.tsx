@@ -65,7 +65,7 @@ function formatDepDate(raw: string): string {
 
 function isValidLink(link?: string): boolean {
   if (!link) return false;
-  return link.startsWith("https://www.aviasales.ru/search/") && link.length > 40;
+  return link.includes("aviasales.ru/search/") && link.length > 35;
 }
 
 function FlightRow({ f, compact, fallbackLink }: { f: FlightInfo; compact?: boolean; fallbackLink?: string }) {

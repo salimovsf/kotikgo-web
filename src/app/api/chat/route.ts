@@ -199,19 +199,22 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
 
     if (flights.length === 0) return "";
 
+    const moreLink = `https://www.aviasales.ru/search/${origin}${destination}1?marker=567508`;
+
     const flightLines = flights.map(f =>
-      `- ${f.airlineName} | ${f.price.toLocaleString("ru")} ₽ | ${f.dateFormatted} ${f.timeFormatted} | ${f.depAirport} → ${f.arrAirport} | ${f.duration} | ${f.stops} | ${f.gate} | ${f.link}`
+      `- ${f.airlineName} | от ${f.price.toLocaleString("ru")} ₽ | ${f.dateFormatted} ${f.timeFormatted} | ${f.depAirport} → ${f.arrAirport} | ${f.duration} | ${f.stops} | ${f.gate} | ${f.link}`
     );
 
     return `\n\nREAL FLIGHT DATA from Travelpayouts (${origin} → ${destination}), sorted by price:
 Format: Airline | Price | Date Time | Route | Duration | Stops | Seller | BuyLink
-IMPORTANT: Use the "Date Time" field exactly as shown (e.g. "25 марта 08:30") in the departure field of the widget.
-If user asked for a SPECIFIC date, show ONLY flights on that date. If no exact date match, show closest dates and mention it.
-${flights.join("\n")}
+${flightLines.join("\n")}
 
-IMPORTANT: Use these EXACT prices and airline names in the flights widget. Show the first one as "best", next 9 as "variants". Include airline full name (not code), airport names, duration, departure time, and number of stops.
-Set "more_link" to exactly: "https://www.aviasales.ru/search/${origin}${destination}?marker=567508"
-For each flight's "link" field, use the BuyLink from the data above. If BuyLink is empty, omit the link field.`;
+CRITICAL INSTRUCTIONS FOR FLIGHTS WIDGET:
+1. Use EXACT data from above — do NOT invent prices, airlines, or links
+2. Set "more_link" to exactly: "${moreLink}"
+3. For each flight "link" field, copy the BuyLink from data above EXACTLY. If empty, set link to "${moreLink}"
+4. Do NOT generate or modify URLs yourself
+5. Show first flight as "best", next 9 as "variants", sorted by price`;
   } catch {
     return "";
   }
