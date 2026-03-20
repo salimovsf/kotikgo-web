@@ -173,25 +173,29 @@ async def _parse_hotel_card(card, page) -> dict:
     if rating_match:
         hotel["rating"] = float(rating_match.group(1).replace(",", "."))
 
-    # Price — look for currency patterns
+    # Price — normalize non-breaking spaces first
+    normalized = text.replace("\xa0", " ")
+
     price_patterns = [
-        (r"([\d\s.,]+)\s*₽", "RUB"),
-        (r"([\d\s.,]+)\s*руб", "RUB"),
-        (r"([\d\s.,]+)\s*RUB", "RUB"),
-        (r"([\d\s.,]+)\s*TRY", "TRY"),
-        (r"([\d\s.,]+)\s*₺", "TRY"),
-        (r"\$\s*([\d\s.,]+)", "USD"),
-        (r"([\d\s.,]+)\s*USD", "USD"),
-        (r"€\s*([\d\s.,]+)", "EUR"),
-        (r"([\d\s.,]+)\s*EUR", "EUR"),
+        (r"([\d .,]+)\s*₽", "RUB"),
+        (r"([\d .,]+)\s*руб", "RUB"),
+        (r"([\d .,]+)\s*RUB", "RUB"),
+        (r"([\d .,]+)\s*TRY", "TRY"),
+        (r"([\d .,]+)\s*₺", "TRY"),
+        (r"\$\s*([\d .,]+)", "USD"),
+        (r"([\d .,]+)\s*USD", "USD"),
+        (r"€\s*([\d .,]+)", "EUR"),
+        (r"([\d .,]+)\s*EUR", "EUR"),
     ]
     for pattern, curr in price_patterns:
-        price_match = re.search(pattern, text)
+        price_match = re.search(pattern, normalized)
         if price_match:
             price_str = price_match.group(1).strip().replace(" ", "").replace(",", "").replace(".", "")
             try:
-                hotel["price"] = int(price_str)
-                hotel["currency"] = curr
+                price_val = int(price_str)
+                if price_val > 0:
+                    hotel["price"] = price_val
+                    hotel["currency"] = curr
             except:
                 pass
             break
