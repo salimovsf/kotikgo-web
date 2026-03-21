@@ -189,6 +189,13 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
 
   await loadAirlines();
 
+  // For specific date (2026-04-10), query the whole month to get multiple results
+  // grouped_prices with exact date returns only 1 result
+  let queryDate = dateStr;
+  if (queryDate && queryDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    queryDate = queryDate.slice(0, 7); // 2026-04-10 → 2026-04
+  }
+
   const params = new URLSearchParams({
     origin,
     destination,
@@ -196,10 +203,10 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
     token,
     group_by: "departure_at",
     sorting: "price",
-    limit: "15",
+    limit: "30",
   });
 
-  if (dateStr) params.set("departure_at", dateStr);
+  if (queryDate) params.set("departure_at", queryDate);
 
   try {
     const res = await fetch(`https://api.travelpayouts.com/aviasales/v3/grouped_prices?${params}`);
@@ -226,7 +233,7 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
         return { airlineName, price, dateFormatted, timeFormatted, depAirport, arrAirport, duration, stops, gate, link };
       })
       .sort((a, b) => a.price - b.price)
-      .slice(0, 12);
+      .slice(0, 15);
 
     if (flights.length === 0) return "";
 
@@ -236,7 +243,9 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
       `- ${f.airlineName} | от ${f.price.toLocaleString("ru")} ₽ | ${f.dateFormatted} ${f.timeFormatted} | ${f.depAirport} → ${f.arrAirport} | ${f.duration} | ${f.stops} | ${f.gate} | ${f.link}`
     );
 
+    const requestedDate = dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}$/) ? dateStr : "";
     return `\n\nREAL FLIGHT DATA from Travelpayouts (${origin} → ${destination}), sorted by price:
+${requestedDate ? `User requested date: ${requestedDate}. Show flights closest to this date first, but include cheaper options on nearby dates too.` : ""}
 Format: Airline | Price | Date Time | Route | Duration | Stops | Seller | BuyLink
 ${flightLines.join("\n")}
 
