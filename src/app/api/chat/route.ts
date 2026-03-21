@@ -189,8 +189,7 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
 
   await loadAirlines();
 
-  // For specific date (2026-04-10), query the whole month to get multiple results
-  // grouped_prices with exact date returns only 1 result
+  // Query by month to get multiple results (API returns 1 per exact date)
   let queryDate = dateStr;
   if (queryDate && queryDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
     queryDate = queryDate.slice(0, 7); // 2026-04-10 → 2026-04
@@ -243,18 +242,18 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
       `- ${f.airlineName} | от ${f.price.toLocaleString("ru")} ₽ | ${f.dateFormatted} ${f.timeFormatted} | ${f.depAirport} → ${f.arrAirport} | ${f.duration} | ${f.stops} | ${f.gate} | ${f.link}`
     );
 
-    const requestedDate = dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}$/) ? dateStr : "";
     return `\n\nREAL FLIGHT DATA from Travelpayouts (${origin} → ${destination}), sorted by price:
-${requestedDate ? `User requested date: ${requestedDate}. Show flights closest to this date first, but include cheaper options on nearby dates too.` : ""}
 Format: Airline | Price | Date Time | Route | Duration | Stops | Seller | BuyLink
 ${flightLines.join("\n")}
 
 CRITICAL INSTRUCTIONS FOR FLIGHTS WIDGET:
-1. Use EXACT data from above — do NOT invent prices, airlines, or links
-2. Set "more_link" to exactly: "${moreLink}"
-3. For each flight "link" field, copy the BuyLink from data above EXACTLY. If empty, set link to "${moreLink}"
-4. Do NOT generate or modify URLs yourself
-5. Show first flight as "best", next 9 as "variants", sorted by price`;
+1. Include ALL flights from the data above in ONE widget — do NOT skip any
+2. Use EXACT prices, airlines, dates from above — do NOT invent
+3. Set "more_link" to exactly: "${moreLink}"
+4. For each flight "link" field, copy BuyLink from data above. If empty, set link to "${moreLink}"
+5. Do NOT generate or modify URLs
+6. Show cheapest as "best", rest as "variants", ALL sorted by price
+7. Note: flights may be to DIFFERENT airports (e.g. Antalya AND Dalaman for Kas) — include ALL, show airport names clearly`;
   } catch {
     return "";
   }

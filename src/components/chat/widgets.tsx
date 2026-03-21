@@ -285,7 +285,8 @@ export function HotelWidget({ data }: WidgetProps) {
   }
 
   function agodaLink(hotelName: string) {
-    return `https://www.agoda.com/search?city=${encodeURIComponent(location)}&checkIn=${checkIn}&checkOut=${checkOut}&textToSearch=${encodeURIComponent(hotelName)}&cid=1922580`;
+    const los = checkIn && checkOut ? Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000)) : 5;
+    return `https://www.agoda.com/search?q=${encodeURIComponent(hotelName + " " + location)}&checkIn=${checkIn || ""}&los=${los}&adults=2&cid=1922580`;
   }
 
   function HotelCard({ h, compact }: { h: RealHotel; compact?: boolean }) {
