@@ -284,9 +284,8 @@ export function HotelWidget({ data }: WidgetProps) {
     );
   }
 
-  function agodaLink(hotelName: string) {
-    const los = checkIn && checkOut ? Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000)) : 5;
-    return `https://www.agoda.com/search?q=${encodeURIComponent(hotelName + " " + location)}&checkIn=${checkIn || ""}&los=${los}&adults=2&cid=1922580`;
+  function googleHotelsLink(hotelName: string) {
+    return `https://www.google.com/travel/hotels/search?q=${encodeURIComponent(hotelName + " " + location)}&checkin=${checkIn || ""}&checkout=${checkOut || ""}`;
   }
 
   function HotelCard({ h, compact }: { h: RealHotel; compact?: boolean }) {
@@ -313,9 +312,9 @@ export function HotelWidget({ data }: WidgetProps) {
           )}
           {!compact && (
             <div className="flex gap-2 mt-1.5">
-              <a href={agodaLink(h.name)} target="_blank" rel="noopener noreferrer"
+              <a href={googleHotelsLink(h.name)} target="_blank" rel="noopener noreferrer"
                 className="text-[10px] font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-2.5 py-1 rounded-md transition-colors">
-                Agoda
+                Все цены →
               </a>
               {h.url && (
                 <a href={h.url} target="_blank" rel="noopener noreferrer"
@@ -332,9 +331,9 @@ export function HotelWidget({ data }: WidgetProps) {
           </div>
           <div className="text-[10px] text-[var(--text-3)]">за всё</div>
           {compact && (
-            <a href={agodaLink(h.name)} target="_blank" rel="noopener noreferrer"
+            <a href={googleHotelsLink(h.name)} target="_blank" rel="noopener noreferrer"
               className="text-[9px] font-bold text-[var(--accent)] hover:underline mt-0.5 block">
-              Agoda →
+              Цены →
             </a>
           )}
         </div>
@@ -402,10 +401,10 @@ export function HotelWidget({ data }: WidgetProps) {
       ))}
 
       <div className="border-t border-[var(--border)]">
-        <a href={`https://www.agoda.com/search?city=${encodeURIComponent(location)}&cid=1922580`}
+        <a href={`https://www.google.com/travel/hotels/search?q=${encodeURIComponent(location)}`}
           target="_blank" rel="noopener noreferrer"
           className="block text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors">
-          Смотреть на Agoda →
+          Смотреть все цены →
         </a>
       </div>
     </div>

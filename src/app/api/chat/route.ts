@@ -189,11 +189,8 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
 
   await loadAirlines();
 
-  // Query by month to get multiple results (API returns 1 per exact date)
-  let queryDate = dateStr;
-  if (queryDate && queryDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    queryDate = queryDate.slice(0, 7); // 2026-04-10 → 2026-04
-  }
+  // Use exact date if provided — API returns 1 cheapest per date
+  const queryDate = dateStr;
 
   const params = new URLSearchParams({
     origin,
