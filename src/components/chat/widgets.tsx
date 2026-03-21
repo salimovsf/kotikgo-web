@@ -284,8 +284,8 @@ export function HotelWidget({ data }: WidgetProps) {
     );
   }
 
-  function bookingLink(hotelName: string) {
-    return `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(hotelName + " " + location)}&checkin=${checkIn}&checkout=${checkOut}&aid=2369041`;
+  function agodaLink(hotelName: string) {
+    return `https://www.agoda.com/search?city=${encodeURIComponent(location)}&checkIn=${checkIn}&checkOut=${checkOut}&textToSearch=${encodeURIComponent(hotelName)}&cid=1922580`;
   }
 
   function HotelCard({ h, compact }: { h: RealHotel; compact?: boolean }) {
@@ -312,9 +312,9 @@ export function HotelWidget({ data }: WidgetProps) {
           )}
           {!compact && (
             <div className="flex gap-2 mt-1.5">
-              <a href={bookingLink(h.name)} target="_blank" rel="noopener noreferrer"
+              <a href={agodaLink(h.name)} target="_blank" rel="noopener noreferrer"
                 className="text-[10px] font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-2.5 py-1 rounded-md transition-colors">
-                Booking.com
+                Agoda
               </a>
               {h.url && (
                 <a href={h.url} target="_blank" rel="noopener noreferrer"
@@ -331,9 +331,9 @@ export function HotelWidget({ data }: WidgetProps) {
           </div>
           <div className="text-[10px] text-[var(--text-3)]">за всё</div>
           {compact && (
-            <a href={bookingLink(h.name)} target="_blank" rel="noopener noreferrer"
+            <a href={agodaLink(h.name)} target="_blank" rel="noopener noreferrer"
               className="text-[9px] font-bold text-[var(--accent)] hover:underline mt-0.5 block">
-              Booking →
+              Agoda →
             </a>
           )}
         </div>
@@ -401,10 +401,10 @@ export function HotelWidget({ data }: WidgetProps) {
       ))}
 
       <div className="border-t border-[var(--border)]">
-        <a href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(location)}&aid=2369041`}
+        <a href={`https://www.agoda.com/search?city=${encodeURIComponent(location)}&cid=1922580`}
           target="_blank" rel="noopener noreferrer"
           className="block text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors">
-          Смотреть на Booking.com →
+          Смотреть на Agoda →
         </a>
       </div>
     </div>

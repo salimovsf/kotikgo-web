@@ -325,15 +325,24 @@ export async function POST(req: Request) {
       };
 
       let dateStr: string | undefined;
+      let returnDateStr: string | undefined;
       const text = lastUserMsg.content.toLowerCase();
 
       // Helper: format date to YYYY-MM-DD
+      const now = new Date();
       function toDateStr(d: Date): string {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       }
 
+      function monthToNum(monthWord: string): string | null {
+        const w = monthWord.trim().slice(0, 6);
+        for (const [key, val] of Object.entries(monthMap)) {
+          if (w.startsWith(key)) return val;
+        }
+        return null;
+      }
+
       // Relative dates: "завтра", "послезавтра", "через N дней"
-      const now = new Date();
       if (text.includes("завтра") && !text.includes("послезавтра")) {
         const d = new Date(now); d.setDate(d.getDate() + 1);
         dateStr = toDateStr(d);
@@ -350,17 +359,63 @@ export async function POST(req: Request) {
         dateStr = toDateStr(d);
       }
 
-      // Try exact date: "25 марта", "3 мая"
+      // Date range: "10-15 апреля", "10 - 15 апреля", "с 10 по 15 апреля"
+      if (!dateStr) {
+        const rangeMatch = text.match(/(\d{1,2})\s*[-–]\s*(\d{1,2})\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)/i);
+        if (rangeMatch) {
+          const day1 = rangeMatch[1].padStart(2, "0");
+          const day2 = rangeMatch[2].padStart(2, "0");
+          const monthWord = rangeMatch[0].replace(/[\d\s\-–]+/, "").trim();
+          const m = monthToNum(monthWord);
+          if (m) {
+            dateStr = `${now.getFullYear()}-${m}-${day1}`;
+            returnDateStr = `${now.getFullYear()}-${m}-${day2}`;
+          }
+        }
+      }
+
+      // "с 10 по 15 апреля"
+      if (!dateStr) {
+        const rangeMatch2 = text.match(/с\s+(\d{1,2})\s+по\s+(\d{1,2})\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)/i);
+        if (rangeMatch2) {
+          const day1 = rangeMatch2[1].padStart(2, "0");
+          const day2 = rangeMatch2[2].padStart(2, "0");
+          const monthWord = rangeMatch2[0].replace(/.*\d+\s+/, "").trim();
+          const m = monthToNum(monthWord);
+          if (m) {
+            dateStr = `${now.getFullYear()}-${m}-${day1}`;
+            returnDateStr = `${now.getFullYear()}-${m}-${day2}`;
+          }
+        }
+      }
+
+      // "10 апреля - 15 апреля" (different months possible)
+      if (!dateStr) {
+        const rangeMatch3 = text.match(/(\d{1,2})\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\s*[-–]\s*(\d{1,2})\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)/i);
+        if (rangeMatch3) {
+          const parts = rangeMatch3[0].split(/[-–]/);
+          const m1 = parts[0].match(/(\d+)\s*(\S+)/);
+          const m2 = parts[1].match(/(\d+)\s*(\S+)/);
+          if (m1 && m2) {
+            const mn1 = monthToNum(m1[2]);
+            const mn2 = monthToNum(m2[2]);
+            if (mn1 && mn2) {
+              dateStr = `${now.getFullYear()}-${mn1}-${m1[1].padStart(2, "0")}`;
+              returnDateStr = `${now.getFullYear()}-${mn2}-${m2[1].padStart(2, "0")}`;
+            }
+          }
+        }
+      }
+
+      // Single date: "25 марта", "3 мая"
       if (!dateStr) {
         const exactMatch = text.match(/(\d{1,2})\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)/i);
         if (exactMatch) {
           const day = exactMatch[1].padStart(2, "0");
-          const monthWord = exactMatch[0].replace(/\d+\s*/, "").trim().slice(0, 6);
-          for (const [key, val] of Object.entries(monthMap)) {
-            if (monthWord.startsWith(key)) {
-              dateStr = `${now.getFullYear()}-${val}-${day}`;
-              break;
-            }
+          const monthWord = exactMatch[0].replace(/\d+\s*/, "").trim();
+          const m = monthToNum(monthWord);
+          if (m) {
+            dateStr = `${now.getFullYear()}-${m}-${day}`;
           }
         }
       }
@@ -399,6 +454,12 @@ export async function POST(req: Request) {
         destAirports.map(apt => fetchFlights(origin, apt, dateStr))
       );
       flightContext = results.filter(Boolean).join("\n");
+
+      // Add date context for AI
+      if (dateStr) {
+        flightContext += `\n\nDETECTED DATES: departure=${dateStr}${returnDateStr ? `, return=${returnDateStr}` : ""}`;
+        flightContext += `\nFor hotel widget, use check_in="${dateStr}" and check_out="${returnDateStr || dateStr}"`;
+      }
     }
   }
 
