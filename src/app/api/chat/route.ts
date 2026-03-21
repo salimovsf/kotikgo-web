@@ -189,8 +189,11 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
 
   await loadAirlines();
 
-  // Use exact date if provided — API returns 1 cheapest per date
-  const queryDate = dateStr;
+  // Query by month — exact date returns only 1 result, month returns 30
+  let queryDate = dateStr;
+  if (queryDate && queryDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    queryDate = queryDate.slice(0, 7); // 2026-04-10 → 2026-04
+  }
 
   const params = new URLSearchParams({
     origin,
@@ -243,14 +246,16 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
 Format: Airline | Price | Date Time | Route | Duration | Stops | Seller | BuyLink
 ${flightLines.join("\n")}
 
+USER REQUESTED DATE: ${dateStr || "not specified"}
+
 CRITICAL INSTRUCTIONS FOR FLIGHTS WIDGET:
-1. Include ALL flights from the data above in ONE widget — do NOT skip any
-2. Use EXACT prices, airlines, dates from above — do NOT invent
-3. Set "more_link" to exactly: "${moreLink}"
-4. For each flight "link" field, copy BuyLink from data above. If empty, set link to "${moreLink}"
-5. Do NOT generate or modify URLs
-6. Show cheapest as "best", rest as "variants", ALL sorted by price
-7. Note: flights may be to DIFFERENT airports (e.g. Antalya AND Dalaman for Kas) — include ALL, show airport names clearly`;
+1. Show ONLY flights from the data above — do NOT invent any flights
+2. If user requested a specific date (e.g. 10 апреля), show ONLY flights on THAT date from the data. If no flights on exact date, show closest dates
+3. Include flights to ALL airports in the data (e.g. both Antalya AND Dalaman)
+4. Use EXACT prices, airlines, dates — do NOT change them
+5. Set "more_link" to exactly: "${moreLink}"
+6. Copy BuyLink from data. If empty, use "${moreLink}"
+7. Sort by price ascending`;
   } catch {
     return "";
   }
