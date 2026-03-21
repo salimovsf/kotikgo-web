@@ -248,14 +248,15 @@ ${flightLines.join("\n")}
 
 USER REQUESTED DATE: ${dateStr || "not specified"}
 
-CRITICAL INSTRUCTIONS FOR FLIGHTS WIDGET:
-1. Show ONLY flights from the data above — do NOT invent any flights
-2. If user requested a specific date (e.g. 10 апреля), show ONLY flights on THAT date from the data. If no flights on exact date, show closest dates
-3. Include flights to ALL airports in the data (e.g. both Antalya AND Dalaman)
-4. Use EXACT prices, airlines, dates — do NOT change them
-5. Set "more_link" to exactly: "${moreLink}"
-6. Copy BuyLink from data. If empty, use "${moreLink}"
-7. Sort by price ascending`;
+INSTRUCTIONS FOR FLIGHTS WIDGET:
+1. Start with the REAL flight data above (exact prices from Travelpayouts)
+2. Then ADD more flights from your knowledge — other airlines that fly this route on the requested date, with approximate prices
+3. Include flights to ALL airports (e.g. both Antalya AND Dalaman for Kas)
+4. For real flights: use exact prices and BuyLinks from data above
+5. For additional flights: use approximate prices based on your knowledge, set link to "${moreLink}"
+6. Set "more_link" to exactly: "${moreLink}"
+7. Show 8-10 flights total, sorted by price ascending
+8. Show the requested date flights, not other dates`;
   } catch {
     return "";
   }
