@@ -206,6 +206,16 @@ export function TransferWidget({ data }: WidgetProps) {
   );
 }
 
+/* ═══════ PHOTO LIGHTBOX ═══════ */
+function PhotoLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+      <button className="absolute top-4 right-4 text-white text-2xl font-bold hover:opacity-70" onClick={onClose}>✕</button>
+      <img src={src.replace(/=w\d+/, "=w800").replace(/=h\d+/, "=h600")} alt={alt} className="max-w-full max-h-[85vh] rounded-xl object-contain" onClick={e => e.stopPropagation()} />
+    </div>
+  );
+}
+
 /* ═══════ HOTEL ═══════ */
 interface RealHotel {
   name: string;
@@ -216,6 +226,7 @@ interface RealHotel {
   photo?: string;
   amenities?: string[];
   reviews_count?: number;
+  url?: string;
 }
 
 export function HotelWidget({ data }: WidgetProps) {
@@ -223,6 +234,7 @@ export function HotelWidget({ data }: WidgetProps) {
   const [realHotels, setRealHotels] = useState<RealHotel[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [lightboxPhoto, setLightboxPhoto] = useState<{ src: string; alt: string } | null>(null);
 
   const location = data.location as string || "";
   const checkIn = data.check_in as string || "";
@@ -272,75 +284,90 @@ export function HotelWidget({ data }: WidgetProps) {
     );
   }
 
-  if (best) {
-    // Real hotels with prices
-    return (
-      <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
-        <div className="px-3 pt-2.5 pb-1 flex items-center gap-1.5 border-b border-[var(--border)]">
-          <span className="text-sm">🏠</span>
-          <span className="text-[12px] font-bold text-[var(--text)]">Отели в {location}</span>
-          <span className="text-[10px] text-[var(--text-3)]">реальные цены</span>
-        </div>
+  function bookingLink(hotelName: string) {
+    return `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(hotelName + " " + location)}&checkin=${checkIn}&checkout=${checkOut}&aid=2369041`;
+  }
 
-        {/* Best hotel */}
-        <div className="p-3 flex gap-3 items-start">
-          {best.photo && (
-            <img src={best.photo} alt={best.name} className="w-16 h-16 rounded-lg object-cover shrink-0" />
+  function HotelCard({ h, compact }: { h: RealHotel; compact?: boolean }) {
+    const photoSize = compact ? "w-12 h-12" : "w-20 h-20";
+    return (
+      <div className={`flex gap-3 ${compact ? "px-3 py-2" : "p-3"} items-start hover:bg-[var(--bg)] transition-colors`}>
+        {h.photo && (
+          <img
+            src={h.photo}
+            alt={h.name}
+            className={`${photoSize} rounded-lg object-cover shrink-0 cursor-pointer hover:opacity-80 transition-opacity`}
+            onClick={() => setLightboxPhoto({ src: h.photo!, alt: h.name })}
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className={`${compact ? "text-[12px]" : "text-[13px]"} font-bold text-[var(--text)]`}>{h.name}</div>
+          <div className="text-[11px] text-[var(--text-3)] mt-0.5">
+            {h.rating && <span>★{h.rating} </span>}
+            {h.reviews_count && <span>({h.reviews_count}) </span>}
+            {h.stars && <span>{"⭐".repeat(h.stars)} </span>}
+          </div>
+          {h.amenities && h.amenities.length > 0 && (
+            <div className="text-[10px] text-[var(--text-3)] mt-0.5">{h.amenities.slice(0, 4).join(" · ")}</div>
           )}
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-bold text-[var(--text)]">{best.name}</div>
-            <div className="text-[11px] text-[var(--text-3)] mt-0.5">
-              {best.rating && <span>★{best.rating} </span>}
-              {best.stars && <span>{"⭐".repeat(best.stars)} </span>}
-              {best.amenities && best.amenities.length > 0 && (
-                <span>· {best.amenities.slice(0, 3).join(", ")}</span>
+          {!compact && (
+            <div className="flex gap-2 mt-1.5">
+              <a href={bookingLink(h.name)} target="_blank" rel="noopener noreferrer"
+                className="text-[10px] font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] px-2.5 py-1 rounded-md transition-colors">
+                Booking.com
+              </a>
+              {h.url && (
+                <a href={h.url} target="_blank" rel="noopener noreferrer"
+                  className="text-[10px] font-bold text-[var(--text-2)] bg-[var(--bg)] border border-[var(--border)] hover:border-[var(--accent)] px-2.5 py-1 rounded-md transition-colors">
+                  Фото и отзывы
+                </a>
               )}
             </div>
-          </div>
-          <div className="text-right shrink-0">
-            <div className="text-[14px] font-extrabold text-[var(--accent)]">
-              {best.price ? `${best.price.toLocaleString("ru")} ${best.currency || ""}` : ""}
-            </div>
-            <div className="text-[10px] text-[var(--text-3)]">за всё</div>
-          </div>
+          )}
         </div>
-
-        {/* Toggle */}
-        {variants.length > 0 && (
-          <div className="px-3 py-2 flex justify-between items-center border-t border-[var(--border)]">
-            <span className="text-[10px] text-[var(--text-3)]">Ещё {variants.length} отелей</span>
-            <ExpandButton expanded={expanded} onClick={() => setExpanded(!expanded)} />
+        <div className="text-right shrink-0">
+          <div className={`${compact ? "text-[12px]" : "text-[14px]"} font-extrabold text-[var(--accent)]`}>
+            {h.price ? `${h.price.toLocaleString("ru")} ${h.currency || ""}` : ""}
           </div>
-        )}
-
-        {/* Expanded */}
-        {expanded && variants.map((h, i) => (
-          <div key={i} className="flex items-center gap-2.5 px-3 py-2 border-t border-[var(--border)] hover:bg-[var(--bg)] transition-colors">
-            {h.photo && (
-              <img src={h.photo} alt={h.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="text-[12px] font-semibold text-[var(--text)]">{h.name}</div>
-              <div className="text-[11px] text-[var(--text-3)]">
-                {h.rating && <span>★{h.rating} </span>}
-                {h.amenities && h.amenities.length > 0 && h.amenities.slice(0, 2).join(", ")}
-              </div>
-            </div>
-            <div className="text-[12.5px] font-bold text-[var(--accent)] shrink-0">
-              {h.price ? `${h.price.toLocaleString("ru")} ${h.currency || ""}` : ""}
-            </div>
-          </div>
-        ))}
-
-        {/* Booking link */}
-        <div className="border-t border-[var(--border)]">
-          <a href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(location)}&checkin=${checkIn}&checkout=${checkOut}&aid=2369041`}
-            target="_blank" rel="noopener noreferrer"
-            className="block text-center py-2.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--bg)] transition-colors">
-            Забронировать на Booking.com →
-          </a>
+          <div className="text-[10px] text-[var(--text-3)]">за всё</div>
+          {compact && (
+            <a href={bookingLink(h.name)} target="_blank" rel="noopener noreferrer"
+              className="text-[9px] font-bold text-[var(--accent)] hover:underline mt-0.5 block">
+              Booking →
+            </a>
+          )}
         </div>
       </div>
+    );
+  }
+
+  if (best) {
+    return (
+      <>
+        {lightboxPhoto && <PhotoLightbox src={lightboxPhoto.src} alt={lightboxPhoto.alt} onClose={() => setLightboxPhoto(null)} />}
+        <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
+          <div className="px-3 pt-2.5 pb-1 flex items-center gap-1.5 border-b border-[var(--border)]">
+            <span className="text-sm">🏠</span>
+            <span className="text-[12px] font-bold text-[var(--text)]">Отели в {location}</span>
+            <span className="text-[10px] text-[var(--text-3)]">реальные цены</span>
+          </div>
+
+          <HotelCard h={best} />
+
+          {variants.length > 0 && (
+            <div className="px-3 py-2 flex justify-between items-center border-t border-[var(--border)]">
+              <span className="text-[10px] text-[var(--text-3)]">Ещё {variants.length} отелей</span>
+              <ExpandButton expanded={expanded} onClick={() => setExpanded(!expanded)} />
+            </div>
+          )}
+
+          {expanded && variants.map((h, i) => (
+            <div key={i} className="border-t border-[var(--border)]">
+              <HotelCard h={h} compact />
+            </div>
+          ))}
+        </div>
+      </>
     );
   }
 

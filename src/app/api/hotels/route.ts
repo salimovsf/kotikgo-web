@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 
-// This endpoint calls our Python scraper on the server
-// The scraper runs Playwright + DataImpulse proxy to get real Google Hotels prices
+// In-memory cache: key = "city|checkIn|checkOut" → { data, timestamp }
+const cache = new Map<string, { data: unknown; ts: number }>();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -15,20 +16,27 @@ export async function GET(req: Request) {
     return Response.json({ error: "city, check_in, check_out required" }, { status: 400 });
   }
 
+  // Check cache
+  const cacheKey = `${city}|${checkIn}|${checkOut}|${adults}|${currency}`;
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    console.log(`[hotels] Cache hit: ${cacheKey}`);
+    return Response.json(cached.data);
+  }
+
   try {
-    // Call Python scraper via internal HTTP (we'll set up a small Flask/FastAPI server)
-    // For now, call directly via shell command and parse output
     const { exec } = await import("child_process");
     const { promisify } = await import("util");
     const execAsync = promisify(exec);
+
+    const safeCity = city.replace(/'/g, "").replace(/"/g, "");
 
     const cmd = `cd /srv/kotikgo-web/scrapers && python3 -c "
 import asyncio, json
 from google_hotels import search_hotels
 
 async def main():
-    hotels = await search_hotels('${city.replace(/'/g, "")}', '${checkIn}', '${checkOut}', ${adults}, '${currency}', 'ru')
-    # Output JSON
+    hotels = await search_hotels('${safeCity}', '${checkIn}', '${checkOut}', ${adults}, '${currency}', 'ru')
     result = []
     for h in hotels:
         result.append({
@@ -47,10 +55,15 @@ async def main():
 asyncio.run(main())
 "`;
 
-    const { stdout } = await execAsync(cmd, { timeout: 45000 });
+    const { stdout } = await execAsync(cmd, { timeout: 60000 });
     const hotels = JSON.parse(stdout.trim());
+    const response = { hotels, city, checkIn, checkOut };
 
-    return Response.json({ hotels, city, checkIn, checkOut });
+    // Save to cache
+    cache.set(cacheKey, { data: response, ts: Date.now() });
+    console.log(`[hotels] Cached: ${cacheKey} (${hotels.length} hotels)`);
+
+    return Response.json(response);
   } catch (err) {
     console.error("Hotels API error:", err);
     return Response.json({ error: "Failed to fetch hotels", hotels: [] }, { status: 500 });
