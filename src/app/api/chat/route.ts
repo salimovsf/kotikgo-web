@@ -189,32 +189,72 @@ async function fetchFlights(origin: string, destination: string, dateStr?: strin
 
   await loadAirlines();
 
-  // Query by month — exact date returns only 1 result, month returns 30
-  let queryDate = dateStr;
-  if (queryDate && queryDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    queryDate = queryDate.slice(0, 7); // 2026-04-10 → 2026-04
-  }
-
-  const params = new URLSearchParams({
-    origin,
-    destination,
-    currency: "RUB",
-    token,
-    group_by: "departure_at",
-    sorting: "price",
-    limit: "30",
-  });
-
-  if (queryDate) params.set("departure_at", queryDate);
-
   try {
-    const res = await fetch(`https://api.travelpayouts.com/aviasales/v3/grouped_prices?${params}`);
-    if (!res.ok) return "";
+    let allFlights: Array<Record<string, unknown>> = [];
 
-    const data = await res.json();
-    if (!data.success || !data.data) return "";
+    // Use week-matrix for specific dates (returns multiple flights per date)
+    if (dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const params = new URLSearchParams({
+        origin,
+        destination,
+        depart_date: dateStr,
+        currency: "RUB",
+        token,
+        show_to_affiliates: "false",
+      });
 
-    const flights = Object.values(data.data)
+      const res = await fetch(`https://api.travelpayouts.com/v2/prices/week-matrix?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        const filtered = (data.data || []).filter((f: Record<string, unknown>) => f.depart_date === dateStr);
+        // Convert v2 format to v3-like
+        for (const f of filtered) {
+          allFlights.push({
+            airline: "", // v2 doesn't give airline code
+            price: f.value,
+            departure_at: `${f.depart_date}T00:00:00`,
+            origin_airport: "",
+            destination_airport: "",
+            transfers: f.number_of_changes,
+            duration_to: f.duration || 0,
+            gate: f.gate || "Aviasales",
+            link: "",
+            flight_number: "",
+          });
+        }
+      }
+    }
+
+    // Also use grouped_prices (by month) for more data
+    const monthDate = dateStr ? (dateStr.match(/^\d{4}-\d{2}/) ? dateStr.slice(0, 7) : dateStr) : undefined;
+    const params2 = new URLSearchParams({
+      origin,
+      destination,
+      currency: "RUB",
+      token,
+      group_by: "departure_at",
+      sorting: "price",
+      limit: "30",
+    });
+    if (monthDate) params2.set("departure_at", monthDate);
+
+    const res2 = await fetch(`https://api.travelpayouts.com/aviasales/v3/grouped_prices?${params2}`);
+    if (res2.ok) {
+      const data2 = await res2.json();
+      if (data2.success && data2.data) {
+        for (const f of Object.values(data2.data) as Array<Record<string, unknown>>) {
+          // Only add if not duplicate (check price + date)
+          const isDup = allFlights.some(
+            ef => ef.price === f.price && (ef.departure_at as string).slice(0, 10) === (f.departure_at as string).slice(0, 10)
+          );
+          if (!isDup) allFlights.push(f);
+        }
+      }
+    }
+
+    if (allFlights.length === 0) return "";
+
+    const flights = allFlights
       .map((f: unknown) => {
         const fl = f as Record<string, unknown>;
         const airlineName = airlineNames[fl.airline as string] || fl.airline;
